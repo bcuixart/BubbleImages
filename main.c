@@ -12,7 +12,11 @@ struct pixel_rgb {
 	unsigned char b;
 };
 
-struct pixel_rgb* read_image_rbg_matrix;
+struct image_data {
+	unsigned int width;
+	unsigned int height;
+	struct pixel_rgb* pixel_rgb_matrix;
+};
 
 void usage()
 {
@@ -29,9 +33,9 @@ void error_and_exit(char* errorMsg, int exitCode)
 void ignore_ppm_comment_line(FILE* file)
 {
 	char c;
-	while (c != '\n') {
+	do {
 		c = getc(file);
-	}
+	} while (c != '\n');
 }
 
 char get_ppm_header_type(FILE* file) 
@@ -117,19 +121,19 @@ unsigned char get_rgb_binary_number_from_ppm(FILE* file, int maxcolorval, char b
 	return (unsigned char)(b * 255.0f);
 }
 
-int parse_ppm_p3_pixel_data(FILE* file, int width, int height, int maxcolorval, char bytesperpixel)
+int parse_ppm_p3_pixel_data(FILE* file, struct image_data* image, int maxcolorval, char bytesperpixel)
 {
-	for (int i = 0; i < height; ++i)
+	for (int i = 0; i < image->height; ++i)
 	{
-		for (int j = 0; j < width; ++j)
+		for (int j = 0; j < image->width; ++j)
 		{
 			unsigned char r = get_rgb_ascii_number_from_ppm(file, maxcolorval);
 			unsigned char g = get_rgb_ascii_number_from_ppm(file, maxcolorval);
 			unsigned char b = get_rgb_ascii_number_from_ppm(file, maxcolorval);
 
-			read_image_rbg_matrix[i * width + j].r = r;
-			read_image_rbg_matrix[i * width + j].g = g;
-			read_image_rbg_matrix[i * width + j].b = b;
+			image->pixel_rgb_matrix[i * image->width + j].r = r;
+			image->pixel_rgb_matrix[i * image->width + j].g = g;
+			image->pixel_rgb_matrix[i * image->width + j].b = b;
 
 			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", i, j, r, g, b);
 		}
@@ -138,19 +142,19 @@ int parse_ppm_p3_pixel_data(FILE* file, int width, int height, int maxcolorval, 
 	return 0;
 }
 
-int parse_ppm_p6_pixel_data(FILE* file, int width, int height, int maxcolorval, char bytesperpixel)
+int parse_ppm_p6_pixel_data(FILE* file, struct image_data* image, int maxcolorval, char bytesperpixel)
 {
-	for (int i = 0; i < height; ++i) 
+	for (int i = 0; i < image->height; ++i)
 	{
-		for (int j = 0; j < width; ++j) 
+		for (int j = 0; j < image->width; ++j)
 		{
 			unsigned char r = get_rgb_binary_number_from_ppm(file, maxcolorval, bytesperpixel);
 			unsigned char g = get_rgb_binary_number_from_ppm(file, maxcolorval, bytesperpixel);
 			unsigned char b = get_rgb_binary_number_from_ppm(file, maxcolorval, bytesperpixel);
 
-			read_image_rbg_matrix[i * width + j].r = r;
-			read_image_rbg_matrix[i * width + j].g = g;
-			read_image_rbg_matrix[i * width + j].b = b;
+			image->pixel_rgb_matrix[i * image->width + j].r = r;
+			image->pixel_rgb_matrix[i * image->width + j].g = g;
+			image->pixel_rgb_matrix[i * image->width + j].b = b;
 
 			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", i, j, r, g, b);
 		}
@@ -159,21 +163,79 @@ int parse_ppm_p6_pixel_data(FILE* file, int width, int height, int maxcolorval, 
 	return 0;
 }
 
-int save_ppm(char* filename, struct pixel_rgb* data, int width, int height)
+struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, int from_x, int to_x, int from_y, int to_y)
 {
-	// El fitxer no canvia si ja existeix... Pero no dona error
+	int total_r = 0;
+	int total_g = 0;
+	int total_b = 0;
+
+	int total_pixels = 0;
+
+	printf("From: (%d, %d), To: (%d, %d)\n", from_x, from_y, to_x, to_y);
+
+	for (int i = from_x; i < to_x; ++i)
+	{
+		for (int j = from_y; j < to_y; ++j)
+		{
+			total_r += image->pixel_rgb_matrix[i * image->width + j].r;
+			total_g += image->pixel_rgb_matrix[i * image->width + j].g;
+			total_b += image->pixel_rgb_matrix[i * image->width + j].b;
+
+			++total_pixels;
+		}
+	}
+
+	struct pixel_rgb result;
+	result.r = total_r / total_pixels;
+	result.g = total_g / total_pixels;
+	result.b = total_b / total_pixels;
+
+	return result;
+}
+
+struct image_data get_smaller_image_data(struct image_data* ori_data, int new_width, int new_height)
+{
+	struct image_data result;
+
+	result.pixel_rgb_matrix = malloc(new_width * new_height * sizeof(struct pixel_rgb));
+
+	for (int i = 0; i < new_height; ++i) 
+	{
+		for (int j = 0; j < new_width; ++j) 
+		{
+			int from_x = ((float)(i) / (float)(new_width) *ori_data->width);
+			int to_x = ((float)(i + 1) / (float)(new_width) *ori_data->width);
+			int from_y = ((float)(j) / (float)(new_height) *ori_data->height);
+			int to_y = ((float)(j + 1) / (float)(new_height) *ori_data->height);
+			if (to_x <= from_x) to_x = from_x + 1;
+			if (to_y <= from_y) to_y = from_y + 1;
+
+			result.pixel_rgb_matrix[i * new_width + j] = get_average_color_from_image_pixels(
+				ori_data,
+				from_x,
+				to_x,
+				from_y,
+				to_y);
+		}
+	}
+
+	return result;
+}
+
+int save_ppm(char* filename, struct image_data* image)
+{
     int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd == -1) error_and_exit("Open output", 7);
 
 	char buff[128];
-	sprintf(buff, "P6\n%d %d\n255\n", width, height);
+	sprintf(buff, "P6\n%d %d\n255\n", image->width, image->height);
 	write(fd, buff, strlen(buff));
 
-	for (int i = 0; i < height; ++i) {
-		for (int j = 0; j < width; ++j) {
-			unsigned char r = data[i * width + j].r;
-			unsigned char g = data[i * width + j].g;
-			unsigned char b = data[i * width + j].b;
+	for (int i = 0; i < image->height; ++i) {
+		for (int j = 0; j < image->width; ++j) {
+			unsigned char r = image->pixel_rgb_matrix[i * image->width + j].r;
+			unsigned char g = image->pixel_rgb_matrix[i * image->width + j].g;
+			unsigned char b = image->pixel_rgb_matrix[i * image->width + j].b;
 
 			unsigned char rgb[3] = { r, g, b };
 			write(fd, rgb, 3);
@@ -185,56 +247,61 @@ int save_ppm(char* filename, struct pixel_rgb* data, int width, int height)
 	return 0;
 }
 
-int parse_ppm(FILE* file, char ppm_header_type)
+struct image_data parse_ppm(FILE* file, char ppm_header_type)
 {
-	int width = get_ascii_number_from_ppm(file);
-	int height = get_ascii_number_from_ppm(file);
-	printf("Width: %d\nHeight: %d\n", width, height);
+	struct image_data result;
+
+	result.width = get_ascii_number_from_ppm(file);
+	result.height = get_ascii_number_from_ppm(file);
+	printf("Width: %d\nHeight: %d\n", result.width, result.height);
 
 	int maxcolorval = get_ascii_number_from_ppm(file);
 	if (maxcolorval < 0 || maxcolorval >= 65536)
 	{
 		printf("Maximum color value: %d (Invalid! Must be between 0 and 65535)\n", maxcolorval);
-		return -1;
+		return result;
 	}
 	printf("Maximum color value: %d\n", maxcolorval);
 
 	char bytesperpixel = (maxcolorval < 256) ? 1 : 2;
 	if (ppm_header_type == 6) printf("Bytes per pixel: %d\n", bytesperpixel);
 
-	read_image_rbg_matrix = malloc(width * height * sizeof(struct pixel_rgb));
+	result.pixel_rgb_matrix = malloc(result.width * result.height * sizeof(struct pixel_rgb));
 
-	if (ppm_header_type == 6) parse_ppm_p6_pixel_data(file, width, height, maxcolorval, bytesperpixel);
-	else if (ppm_header_type == 3) parse_ppm_p3_pixel_data(file, width, height, maxcolorval, bytesperpixel);
+	if (ppm_header_type == 6) parse_ppm_p6_pixel_data(file, &result, maxcolorval, bytesperpixel);
+	else if (ppm_header_type == 3) parse_ppm_p3_pixel_data(file, &result, maxcolorval, bytesperpixel);
+
+	return result;
+}
+
+void make_smaller_image(char* filename, struct image_data* ori_data, int new_width, int new_height)
+{
+	struct image_data smaller_image_data = get_smaller_image_data(ori_data, new_width, new_height);
 
 	printf("Writing...\n");
-	save_ppm("Output.ppm", read_image_rbg_matrix, width, height);
+	//save_ppm(filename, smaller_image_data, new_width, new_height);
 	printf("Done!\n");
 
-	free(read_image_rbg_matrix);
-
-	return 0;
+	free(smaller_image_data.pixel_rgb_matrix);
 }
 
 int main(int argc, char** argv) 
 {
 	if (argc != 2) usage();
 
-	int fd = open(argv[1], O_RDONLY);
-	if (fd == -1) error_and_exit("Open", 2);
-
-	FILE* file = fdopen(fd, "r");
-	if (file == NULL) {
-		close(fd);
-		error_and_exit("FDOpen", 5);
-	}
+	FILE* file = fopen(argv[1], "r");
+	if (file == NULL) error_and_exit("FDOpen", 5);
 
 	char ppm_header_type = get_ppm_header_type(file);
 	if (ppm_header_type != 3 && ppm_header_type != 6) printf("Could not identify type. Idiot.\nAre you sure this is a PPM file?\n");
 	else {
 		printf("Type: P%d\n", ppm_header_type);
-		parse_ppm(file, ppm_header_type);
+		struct image_data read_image_data = parse_ppm(file, ppm_header_type);
+
+		make_smaller_image("Output.ppm", &read_image_data, 10, 10);
+
+		free(read_image_data.pixel_rgb_matrix);
 	}
 
-	if (close(fd) == -1) error_and_exit("Close", 3);
+	if (fclose(file) == -1) error_and_exit("FClose", 3);
 }
