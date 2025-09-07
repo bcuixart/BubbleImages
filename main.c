@@ -165,6 +165,11 @@ int parse_ppm_p6_pixel_data(FILE* file, struct image_data* image, int maxcolorva
 
 struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, int from_x, int to_x, int from_y, int to_y)
 {
+	from_x = (from_x < 0) ? 0 : from_x;
+	from_y = (from_y < 0) ? 0 : from_y;
+	to_x = (to_x > image->width) ? image->width : to_x;
+	to_y = (to_y > image->height) ? image->height : to_y;
+
 	int total_r = 0;
 	int total_g = 0;
 	int total_b = 0;
@@ -177,9 +182,9 @@ struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, i
 	{
 		for (int j = from_y; j < to_y; ++j)
 		{
-			total_r += image->pixel_rgb_matrix[i * image->width + j].r;
-			total_g += image->pixel_rgb_matrix[i * image->width + j].g;
-			total_b += image->pixel_rgb_matrix[i * image->width + j].b;
+			total_r += image->pixel_rgb_matrix[(j * image->width) + i].r;
+			total_g += image->pixel_rgb_matrix[(j * image->width) + i].g;
+			total_b += image->pixel_rgb_matrix[(j * image->width) + i].b;
 
 			++total_pixels;
 		}
@@ -211,10 +216,10 @@ struct image_data get_smaller_image_data(struct image_data* ori_data, int new_wi
 	{
 		for (int j = 0; j < new_width; ++j) 
 		{
-			int from_x = (float)(i) / (float)(new_width) * ori_data->width;
-			int to_x = (float)(i + 1) / (float)(new_width) * ori_data->width;
-			int from_y = (float)(j) / (float)(new_height) * ori_data->height;
-			int to_y = (float)(j + 1) / (float)(new_height) * ori_data->height;
+			int from_x = (float)(j) / (float)(new_width)*ori_data->width;
+			int to_x = (float)(j + 1) / (float)(new_width)*ori_data->width;
+			int from_y = (float)(i) / (float)(new_height)*ori_data->height;
+			int to_y = (float)(i + 1) / (float)(new_height)*ori_data->height;
 
 			if (to_x <= from_x) to_x = from_x + 1;
 			if (to_y <= from_y) to_y = from_y + 1;
