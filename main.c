@@ -171,7 +171,7 @@ struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, i
 
 	int total_pixels = 0;
 
-	printf("From: (%d, %d), To: (%d, %d)\n", from_x, from_y, to_x, to_y);
+	//printf("From: (%d, %d), To: (%d, %d)\n", from_x, from_y, to_x, to_y);
 
 	for (int i = from_x; i < to_x; ++i)
 	{
@@ -186,6 +186,12 @@ struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, i
 	}
 
 	struct pixel_rgb result;
+
+	if (total_pixels == 0) {
+		result.r = result.g = result.b = 0;
+		return result;
+	}
+
 	result.r = total_r / total_pixels;
 	result.g = total_g / total_pixels;
 	result.b = total_b / total_pixels;
@@ -196,6 +202,8 @@ struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, i
 struct image_data get_smaller_image_data(struct image_data* ori_data, int new_width, int new_height)
 {
 	struct image_data result;
+	result.width = new_width;
+	result.height = new_height;
 
 	result.pixel_rgb_matrix = malloc(new_width * new_height * sizeof(struct pixel_rgb));
 
@@ -203,10 +211,11 @@ struct image_data get_smaller_image_data(struct image_data* ori_data, int new_wi
 	{
 		for (int j = 0; j < new_width; ++j) 
 		{
-			int from_x = ((float)(i) / (float)(new_width) *ori_data->width);
-			int to_x = ((float)(i + 1) / (float)(new_width) *ori_data->width);
-			int from_y = ((float)(j) / (float)(new_height) *ori_data->height);
-			int to_y = ((float)(j + 1) / (float)(new_height) *ori_data->height);
+			int from_x = (float)(i) / (float)(new_width) * ori_data->width;
+			int to_x = (float)(i + 1) / (float)(new_width) * ori_data->width;
+			int from_y = (float)(j) / (float)(new_height) * ori_data->height;
+			int to_y = (float)(j + 1) / (float)(new_height) * ori_data->height;
+
 			if (to_x <= from_x) to_x = from_x + 1;
 			if (to_y <= from_y) to_y = from_y + 1;
 
@@ -279,7 +288,7 @@ void make_smaller_image(char* filename, struct image_data* ori_data, int new_wid
 	struct image_data smaller_image_data = get_smaller_image_data(ori_data, new_width, new_height);
 
 	printf("Writing...\n");
-	//save_ppm(filename, smaller_image_data, new_width, new_height);
+	save_ppm(filename, &smaller_image_data);
 	printf("Done!\n");
 
 	free(smaller_image_data.pixel_rgb_matrix);
