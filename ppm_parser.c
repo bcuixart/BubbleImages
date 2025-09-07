@@ -1,6 +1,6 @@
 #include "ppm_parser.h"
 
-struct image_data parse_ppm(FILE* file, char ppm_header_type)
+struct image_data parse_ppm(FILE* file, enum ImageType image_type)
 {
 	struct image_data result;
 
@@ -17,13 +17,13 @@ struct image_data parse_ppm(FILE* file, char ppm_header_type)
 	printf("Maximum color value: %d\n", maxcolorval);
 
 	char bytesperpixel = (maxcolorval < 256) ? 1 : 2;
-	if (ppm_header_type == 6) printf("Bytes per pixel: %d\n", bytesperpixel);
+	if (image_type == PPM_P6) printf("Bytes per pixel: %d\n", bytesperpixel);
 
 	result.pixel_rgb_matrix = malloc(result.width * result.height * sizeof(struct pixel_rgb));
 
 	int was_error = 0;
-	if (ppm_header_type == 6) was_error = parse_ppm_p6_pixel_data(file, &result, maxcolorval, bytesperpixel);
-	else if (ppm_header_type == 3) was_error = parse_ppm_p3_pixel_data(file, &result, maxcolorval, bytesperpixel);
+	if (image_type == PPM_P6) was_error = parse_ppm_p6_pixel_data(file, &result, maxcolorval, bytesperpixel);
+	else if (image_type == PPM_P3) was_error = parse_ppm_p3_pixel_data(file, &result, maxcolorval, bytesperpixel);
 
 	if (was_error) result.width = -1;
 

@@ -20,22 +20,15 @@ void error_and_exit(char* errorMsg, int exitCode)
 	exit(exitCode);
 }
 
-char get_ppm_header_type(FILE* file) 
+enum ImageType get_image_type_from_file(FILE* file)
 {
-	char c = getc(file);
-	while (c == '#') 
-	{
-		ignore_ppm_comment_line(file);
-		c = getc(file);
-	}
+	char c1 = getc(file);
+	char c2 = getc(file);
 
-	char c2;
-	c2 = getc(file);
+	if (c1 == 'P' && c2 == '3') return PPM_P3;
+	if (c1 == 'P' && c2 == '6') return PPM_P6;
 
-	if (c == 'P' && c2 == '3') return 3;
-	if (c == 'P' && c2 == '6') return 6;
-
-	return 0;
+	return UNKNOWN;
 }
 
 struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, int from_x, int to_x, int from_y, int to_y)
@@ -129,11 +122,12 @@ int main(int argc, char** argv)
 	FILE* file = fopen(argv[1], "r");
 	if (file == NULL) error_and_exit("FDOpen", 5);
 
-	char ppm_header_type = get_ppm_header_type(file);
-	if (ppm_header_type != 3 && ppm_header_type != 6) printf("Could not identify type. Idiot.\nAre you sure this is a PPM file?\n");
+	enum ImageType image_type = get_image_type_from_file(file);
+
+	if (image_type == UNKNOWN) printf("Could not identify file type. You idiot.\nCurrently only PPM is supported.\n");
 	else {
-		printf("Type: P%d\n", ppm_header_type);
-		struct image_data read_image_data = parse_ppm(file, ppm_header_type);
+		printf("Type: %d\n", image_type);
+		struct image_data read_image_data = parse_ppm(file, image_type);
 		if (read_image_data.width == -1) error_and_exit("Read data", 6);
 
 		make_smaller_image("output/Output.ppm", &read_image_data, 1, 1);
