@@ -11,7 +11,7 @@
 #include "image.h"
 
 int parse_ppm(FILE* file, struct image_data* image, char ppm_type);
-int save_ppm(char* filename, struct image_data* image);
+int save_ppm(struct image_data* image, char* filename);
 
 int parse_ppm_p3_pixel_data(FILE* file, struct image_data* image, int maxcolorval, char bytesperpixel);
 int parse_ppm_p6_pixel_data(FILE* file, struct image_data* image, int maxcolorval, char bytesperpixel);

@@ -19,16 +19,13 @@ int parse_ppm(FILE* file, struct image_data* image, char ppm_type)
 
 	image->pixel_rgb_matrix = malloc(image->width * image->height * sizeof(struct pixel_rgb));
 
-	int was_error = 0;
-	if (ppm_type == 6) was_error = parse_ppm_p6_pixel_data(file, image, maxcolorval, bytesperpixel);
-	else if (ppm_type == 3) was_error = parse_ppm_p3_pixel_data(file, image, maxcolorval, bytesperpixel);
+	if (ppm_type == 6) return parse_ppm_p6_pixel_data(file, image, maxcolorval, bytesperpixel);
+	else if (ppm_type == 3) return parse_ppm_p3_pixel_data(file, image, maxcolorval, bytesperpixel);
 
-	if (was_error) return -1;
-
-	return 0;
+	return -1;
 }
 
-int save_ppm(char* filename, struct image_data* image)
+int save_ppm(struct image_data* image, char* filename)
 {
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1) return -1;

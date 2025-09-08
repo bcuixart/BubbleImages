@@ -26,7 +26,10 @@ int main(int argc, char** argv)
 	struct image_data read_image_data;
 	if (read_image(argv[1], &read_image_data) == -1) error_and_exit("Loading image", 7);
 
-	if (make_smaller_image("output/Output.ppm", &read_image_data, 10, 10) == -1) error_and_exit("Creating image", 8);
+	struct image_data smaller_image_data;
+	if (get_smaller_image_data(&read_image_data, &smaller_image_data, 10, 10) == -1) error_and_exit("Making smaller image", 8);
+	if (save_image_as_ppm(&smaller_image_data, "output/Output.ppm") == -1) error_and_exit("Saving smaller image", 9);
 
-	//free(read_image_data.pixel_rgb_matrix);
+	free(smaller_image_data.pixel_rgb_matrix);
+	free(read_image_data.pixel_rgb_matrix);
 }

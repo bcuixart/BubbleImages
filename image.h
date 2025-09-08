@@ -25,12 +25,11 @@ enum ImageType {
 #include "ppm_parser.h" // Si, ha d'anar aqui.
 
 int read_image(char* filename, struct image_data* result);
+int save_image_as_ppm(struct image_data* data, char* filename);
 
 enum ImageType get_image_type_from_file(FILE* file);
 
-struct image_data get_smaller_image_data(struct image_data* ori_data, int new_width, int new_height);
-int make_smaller_image(char* filename, struct image_data* ori_data, int new_width, int new_height);
-
+int get_smaller_image_data(struct image_data* ori_data, struct image_data* new_data, int new_width, int new_height);
 struct pixel_rgb get_average_color_from_image_pixels(struct image_data* image, int from_x, int to_x, int from_y, int to_y);
 
 #endif
