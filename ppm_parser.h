@@ -10,7 +10,7 @@
 
 #include "image.h"
 
-struct image_data parse_ppm(FILE* file, enum ImageType image_type);
+int parse_ppm(FILE* file, struct image_data* image, char ppm_type);
 int save_ppm(char* filename, struct image_data* image);
 
 int parse_ppm_p3_pixel_data(FILE* file, struct image_data* image, int maxcolorval, char bytesperpixel);

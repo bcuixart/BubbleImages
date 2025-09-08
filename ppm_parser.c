@@ -1,33 +1,31 @@
 #include "ppm_parser.h"
 
-struct image_data parse_ppm(FILE* file, enum ImageType image_type)
+int parse_ppm(FILE* file, struct image_data* image, char ppm_type)
 {
-	struct image_data result;
-
-	result.width = get_ascii_number_from_ppm(file);
-	result.height = get_ascii_number_from_ppm(file);
-	printf("Width: %d\nHeight: %d\n", result.width, result.height);
+	image->width = get_ascii_number_from_ppm(file);
+	image->height = get_ascii_number_from_ppm(file);
+	printf("Width: %d\nHeight: %d\n", image->width, image->height);
 
 	int maxcolorval = get_ascii_number_from_ppm(file);
 	if (maxcolorval < 0 || maxcolorval >= 65536)
 	{
 		printf("Maximum color value: %d (Invalid! Must be between 0 and 65535)\n", maxcolorval);
-		return result;
+		return -1;
 	}
 	printf("Maximum color value: %d\n", maxcolorval);
 
 	char bytesperpixel = (maxcolorval < 256) ? 1 : 2;
-	if (image_type == PPM_P6) printf("Bytes per pixel: %d\n", bytesperpixel);
+	if (ppm_type == 6) printf("Bytes per pixel: %d\n", bytesperpixel);
 
-	result.pixel_rgb_matrix = malloc(result.width * result.height * sizeof(struct pixel_rgb));
+	image->pixel_rgb_matrix = malloc(image->width * image->height * sizeof(struct pixel_rgb));
 
 	int was_error = 0;
-	if (image_type == PPM_P6) was_error = parse_ppm_p6_pixel_data(file, &result, maxcolorval, bytesperpixel);
-	else if (image_type == PPM_P3) was_error = parse_ppm_p3_pixel_data(file, &result, maxcolorval, bytesperpixel);
+	if (ppm_type == 6) was_error = parse_ppm_p6_pixel_data(file, image, maxcolorval, bytesperpixel);
+	else if (ppm_type == 3) was_error = parse_ppm_p3_pixel_data(file, image, maxcolorval, bytesperpixel);
 
-	if (was_error) result.width = -1;
+	if (was_error) return -1;
 
-	return result;
+	return 0;
 }
 
 int save_ppm(char* filename, struct image_data* image)
