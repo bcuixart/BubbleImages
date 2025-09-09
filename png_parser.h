@@ -17,15 +17,19 @@ enum png_chunk_type {
 	PLTE,
 	Ancillary,
 	Private,
-	ReadError
+	ReadError,
+	IncorrectFormat
 };
 
 int parse_png(FILE* file, struct image_data* image);
 
-enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image);
+enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method);
 
 unsigned int read_four_byte_integer(FILE* file);
 enum png_chunk_type read_png_chunk_type(FILE* file);
+
+int read_ihdr_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method);
+int read_and_ignore_data(FILE* file, unsigned int bytes);
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte);
 

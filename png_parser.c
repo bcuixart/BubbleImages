@@ -2,16 +2,23 @@
 
 int parse_png(FILE* file, struct image_data* image)
 {
+    unsigned char bit_depth = 0;
+    unsigned char color_type = 0;
+    unsigned char compression_method = 0;
+    unsigned char filter_method = 0;
+    unsigned char interlace_method = 0;
+
     enum png_chunk_type chunk_type;
     do
     {
-        chunk_type = read_png_chunk(file, image);
-    } while (chunk_type != IEND && chunk_type != ReadError);
+        chunk_type = read_png_chunk(file, image, &bit_depth, &color_type, &compression_method, &filter_method, &interlace_method);
+    } while (chunk_type != IEND && chunk_type != ReadError && chunk_type != IncorrectFormat);
 	
-	return (chunk_type == ReadError) ? -1 : 0;
+    if (chunk_type == IncorrectFormat) printf("Unsupported PNG format.\n");
+	return (chunk_type == ReadError || chunk_type == IncorrectFormat) ? -1 : 0;
 }
 
-enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image)
+enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method)
 {
     unsigned int chunk_data_length = read_four_byte_integer(file);
 	printf("Chunk data length: %d\n", chunk_data_length);
@@ -19,11 +26,36 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image)
     enum png_chunk_type chunk_type = read_png_chunk_type(file);
     printf("Chunk type: %d\n", chunk_type);
 
-    for (int i = 0; i < chunk_data_length; ++i)
+    switch (chunk_type) 
     {
-        unsigned char c = getc(file);
+        case IHDR:
+            int result = read_ihdr_chunk(file, image, bit_depth, color_type, compression_method, filter_method, interlace_method);
+            if (result == -1) return ReadError;
+            if (result == -2) return IncorrectFormat;
+            break;
+        case IEND:
+            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            break;
+        case IDAT:
+            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            break;
+        case PLTE:
+            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            break;
+        case Ancillary:
+            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            break;
+        case Private:
+            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            break;
+        case ReadError:
+            return ReadError;
+            break;
+        case IncorrectFormat:
+            return IncorrectFormat;
+            break;
     }
-
+        
     unsigned int chunk_crc = read_four_byte_integer(file);
     printf("Chunk crc: %d\n\n", chunk_crc);
 
@@ -61,6 +93,49 @@ enum png_chunk_type read_png_chunk_type(FILE* file)
     // 4th byte is only for copying files, not needed
 
     return ReadError;
+}
+
+int read_ihdr_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method)
+{
+    unsigned int width = read_four_byte_integer(file);
+    unsigned int height = read_four_byte_integer(file);
+
+    image->width = width;
+    image->height = height;
+
+    printf("Width: %d\nHeight: %d\n", width, height);
+
+    image->pixel_rgb_matrix = malloc(width * height * sizeof(struct pixel_rgb));
+
+    *bit_depth = getc(file);
+    *color_type = getc(file);
+    *compression_method = getc(file);
+    *filter_method = getc(file);
+    *interlace_method = getc(file);
+
+    printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\n", *bit_depth, *color_type, *compression_method, *filter_method, *interlace_method);
+
+    if (*color_type == 1 || *color_type == 5 || *color_type > 6) return -2; // Non-existent formats
+
+    if (*color_type == 0) {
+        if (*bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8 && *bit_depth != 16) return -2; // Non-existent formats
+    }
+    else if (*color_type == 2 || *color_type == 4 || *color_type == 6) {
+        if (*bit_depth != 8 && *bit_depth != 16) return -2; // Non-existent formats
+    }
+    if (*color_type == 3) {
+        if (*bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8) return -2; // Non-existent formats
+    }
+
+    if (*compression_method != 0 || *filter_method != 0) return -2; // Invalid values, must be 0
+    if (*interlace_method != 0 && *interlace_method != 1) return -2; // Invalid values, must be 0 or 1
+
+    return 0;
+}
+
+int read_and_ignore_data(FILE* file, unsigned int bytes)
+{
+    for (int i = 0; i < bytes; ++i) if(getc(file) == -1) return -1;
 }
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte)
