@@ -22,10 +22,11 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
     enum png_chunk_type chunk_type = read_png_chunk_type(file);
     printf("Chunk type: %d\n", chunk_type);
 
+    int result;
     switch (chunk_type) 
     {
         case IHDR:
-            int result = read_ihdr_chunk(file, image, header_info);
+            result = read_ihdr_chunk(file, image, header_info);
             if (result == -1) return ReadError;
             if (result == -2) return IncorrectFormat;
             break;
@@ -33,10 +34,13 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
             if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
             break;
         case IDAT:
+            header_info->read_first_idat_chunk = 1;
             if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
             break;
         case PLTE:
-            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            result = read_plte_chunk(file, header_info, chunk_data_length);
+            if (result == -1) return ReadError;
+            if (result == -2) return IncorrectFormat;            
             break;
         case Ancillary:
             if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
@@ -135,9 +139,34 @@ int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_header_info
     return 0;
 }
 
+int read_plte_chunk(FILE* file, struct png_header_info* header_info, int chunk_length)
+{
+    if (header_info->has_palette) return -2; // There must only be a palette
+    if (header_info->read_first_idat_chunk) return -2; // Palettes, if present, must appear before IDAT chunks
+    if (chunk_length % 3 != 0) return -2; // Must be a multiple of 3
+
+    unsigned int number_of_colors = chunk_length / 3;
+    if (number_of_colors > (1 << header_info->bit_depth)) return -2; // There cannot be more colors than can be represented with bit depth bits
+
+    header_info->has_palette = 1;
+    header_info->palette.number_of_colors = number_of_colors;
+    header_info->palette.colors = malloc(number_of_colors * sizeof(struct png_palette_color));
+
+    for (int i = 0; i < number_of_colors; ++i)
+    {
+        header_info->palette.colors[i].r = getc(file);
+        header_info->palette.colors[i].g = getc(file);
+        header_info->palette.colors[i].b = getc(file);
+    }
+
+    return 0;
+}
+
 int read_and_ignore_data(FILE* file, unsigned int bytes)
 {
     for (int i = 0; i < bytes; ++i) if(getc(file) == -1) return -1;
+
+    return 0;
 }
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte)
