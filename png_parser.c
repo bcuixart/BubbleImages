@@ -2,23 +2,19 @@
 
 int parse_png(FILE* file, struct image_data* image)
 {
-    unsigned char bit_depth = 0;
-    unsigned char color_type = 0;
-    unsigned char compression_method = 0;
-    unsigned char filter_method = 0;
-    unsigned char interlace_method = 0;
+    struct png_header_info header_info;
 
     enum png_chunk_type chunk_type;
     do
     {
-        chunk_type = read_png_chunk(file, image, &bit_depth, &color_type, &compression_method, &filter_method, &interlace_method);
+        chunk_type = read_png_chunk(file, image, &header_info);
     } while (chunk_type != IEND && chunk_type != ReadError && chunk_type != IncorrectFormat);
 	
     if (chunk_type == IncorrectFormat) printf("Unsupported PNG format.\n");
 	return (chunk_type == ReadError || chunk_type == IncorrectFormat) ? -1 : 0;
 }
 
-enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method)
+enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_header_info* header_info)
 {
     unsigned int chunk_data_length = read_four_byte_integer(file);
 	printf("Chunk data length: %d\n", chunk_data_length);
@@ -29,7 +25,7 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, unsigne
     switch (chunk_type) 
     {
         case IHDR:
-            int result = read_ihdr_chunk(file, image, bit_depth, color_type, compression_method, filter_method, interlace_method);
+            int result = read_ihdr_chunk(file, image, header_info);
             if (result == -1) return ReadError;
             if (result == -2) return IncorrectFormat;
             break;
@@ -95,7 +91,7 @@ enum png_chunk_type read_png_chunk_type(FILE* file)
     return ReadError;
 }
 
-int read_ihdr_chunk(FILE* file, struct image_data* image, unsigned char* bit_depth, unsigned char* color_type, unsigned char* compression_method, unsigned char* filter_method, unsigned char* interlace_method)
+int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_header_info* header_info)
 {
     unsigned int width = read_four_byte_integer(file);
     unsigned int height = read_four_byte_integer(file);
@@ -107,28 +103,34 @@ int read_ihdr_chunk(FILE* file, struct image_data* image, unsigned char* bit_dep
 
     image->pixel_rgb_matrix = malloc(width * height * sizeof(struct pixel_rgb));
 
-    *bit_depth = getc(file);
-    *color_type = getc(file);
-    *compression_method = getc(file);
-    *filter_method = getc(file);
-    *interlace_method = getc(file);
+    unsigned char bit_depth = getc(file);
+    unsigned char color_type = getc(file);
+    unsigned char compression_method = getc(file);
+    unsigned char filter_method = getc(file);
+    unsigned char interlace_method = getc(file);
 
-    printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\n", *bit_depth, *color_type, *compression_method, *filter_method, *interlace_method);
+    header_info->bit_depth = bit_depth;
+    header_info->color_type = color_type;
+    header_info->compression_method = compression_method;
+    header_info->filter_method = filter_method;
+    header_info->interlace_method = interlace_method;
 
-    if (*color_type == 1 || *color_type == 5 || *color_type > 6) return -2; // Non-existent formats
+    printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\n", bit_depth, color_type, compression_method, filter_method, interlace_method);
 
-    if (*color_type == 0) {
-        if (*bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8 && *bit_depth != 16) return -2; // Non-existent formats
+    if (color_type == 1 || color_type == 5 || color_type > 6) return -2; // Non-existent formats
+
+    if (color_type == 0) {
+        if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
     }
-    else if (*color_type == 2 || *color_type == 4 || *color_type == 6) {
-        if (*bit_depth != 8 && *bit_depth != 16) return -2; // Non-existent formats
+    else if (color_type == 2 || color_type == 4 || color_type == 6) {
+        if (bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
     }
-    if (*color_type == 3) {
-        if (*bit_depth != 1 && *bit_depth != 2 && *bit_depth != 4 && *bit_depth != 8) return -2; // Non-existent formats
+    if (color_type == 3) {
+        if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8) return -2; // Non-existent formats
     }
 
-    if (*compression_method != 0 || *filter_method != 0) return -2; // Invalid values, must be 0
-    if (*interlace_method != 0 && *interlace_method != 1) return -2; // Invalid values, must be 0 or 1
+    if (compression_method != 0 || filter_method != 0) return -2; // Invalid values, must be 0
+    if (interlace_method != 0 && interlace_method != 1) return -2; // Invalid values, must be 0 or 1
 
     return 0;
 }
