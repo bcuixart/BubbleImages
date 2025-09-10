@@ -2,19 +2,19 @@
 
 int parse_png(FILE* file, struct image_data* image)
 {
-    struct png_header_info header_info;
+    struct png_info image_info;
 
     enum png_chunk_type chunk_type;
     do
     {
-        chunk_type = read_png_chunk(file, image, &header_info);
+        chunk_type = read_png_chunk(file, image, &image_info);
     } while (chunk_type != IEND && chunk_type != ReadError && chunk_type != IncorrectFormat);
 	
     if (chunk_type == IncorrectFormat) printf("Unsupported PNG format.\n");
 	return (chunk_type == ReadError || chunk_type == IncorrectFormat) ? -1 : 0;
 }
 
-enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_header_info* header_info)
+enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
 {
     unsigned int chunk_data_length = read_four_byte_integer(file);
 	printf("Chunk data length: %d\n", chunk_data_length);
@@ -26,7 +26,7 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
     switch (chunk_type) 
     {
         case IHDR:
-            result = read_ihdr_chunk(file, image, header_info);
+            result = read_ihdr_chunk(file, image, image_info);
             if (result == -1) return ReadError;
             if (result == -2) return IncorrectFormat;
             break;
@@ -34,11 +34,12 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
             if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
             break;
         case IDAT:
-            header_info->read_first_idat_chunk = 1;
-            if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
+            result = read_idat_chunk(file, image, image_info);
+            if (result == -1) return ReadError;
+            if (result == -2) return IncorrectFormat;
             break;
         case PLTE:
-            result = read_plte_chunk(file, header_info, chunk_data_length);
+            result = read_plte_chunk(file, image_info, chunk_data_length);
             if (result == -1) return ReadError;
             if (result == -2) return IncorrectFormat;            
             break;
@@ -95,7 +96,7 @@ enum png_chunk_type read_png_chunk_type(FILE* file)
     return ReadError;
 }
 
-int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_header_info* header_info)
+int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
 {
     unsigned int width = read_four_byte_integer(file);
     unsigned int height = read_four_byte_integer(file);
@@ -113,11 +114,11 @@ int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_header_info
     unsigned char filter_method = getc(file);
     unsigned char interlace_method = getc(file);
 
-    header_info->bit_depth = bit_depth;
-    header_info->color_type = color_type;
-    header_info->compression_method = compression_method;
-    header_info->filter_method = filter_method;
-    header_info->interlace_method = interlace_method;
+    image_info->bit_depth = bit_depth;
+    image_info->color_type = color_type;
+    image_info->compression_method = compression_method;
+    image_info->filter_method = filter_method;
+    image_info->interlace_method = interlace_method;
 
     printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\n", bit_depth, color_type, compression_method, filter_method, interlace_method);
 
@@ -139,25 +140,33 @@ int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_header_info
     return 0;
 }
 
-int read_plte_chunk(FILE* file, struct png_header_info* header_info, int chunk_length)
+int read_plte_chunk(FILE* file, struct png_info* image_info, int chunk_length)
 {
-    if (header_info->has_palette) return -2; // There must only be a palette
-    if (header_info->read_first_idat_chunk) return -2; // Palettes, if present, must appear before IDAT chunks
+    if (image_info->has_palette) return -2; // There must only be a palette
+    if (image_info->read_first_idat_chunk) return -2; // Palettes, if present, must appear before IDAT chunks
     if (chunk_length % 3 != 0) return -2; // Must be a multiple of 3
 
     unsigned int number_of_colors = chunk_length / 3;
-    if (number_of_colors > (1 << header_info->bit_depth)) return -2; // There cannot be more colors than can be represented with bit depth bits
+    if (number_of_colors > (1 << image_info->bit_depth)) return -2; // There cannot be more colors than can be represented with bit depth bits
 
-    header_info->has_palette = 1;
-    header_info->palette.number_of_colors = number_of_colors;
-    header_info->palette.colors = malloc(number_of_colors * sizeof(struct png_palette_color));
+    image_info->has_palette = 1;
+    image_info->palette.number_of_colors = number_of_colors;
+    image_info->palette.colors = malloc(number_of_colors * sizeof(struct png_palette_color));
 
     for (int i = 0; i < number_of_colors; ++i)
     {
-        header_info->palette.colors[i].r = getc(file);
-        header_info->palette.colors[i].g = getc(file);
-        header_info->palette.colors[i].b = getc(file);
+        image_info->palette.colors[i].r = getc(file);
+        image_info->palette.colors[i].g = getc(file);
+        image_info->palette.colors[i].b = getc(file);
     }
+
+    return 0;
+}
+
+int read_idat_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
+{
+    if (image_info->color_type == 3 && !image_info->has_palette) return -2; // If color type is 3, a palette must have been defined
+    image_info->read_first_idat_chunk = 1;
 
     return 0;
 }
