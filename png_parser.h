@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #include "image.h"
 
@@ -43,6 +44,9 @@ struct png_info {
 	unsigned char read_first_idat_chunk;
 	unsigned char has_palette;
 	struct png_palette palette;
+
+	unsigned char* data_stream;
+	unsigned int data_total_size;
 };
 
 int parse_png(FILE* file, struct image_data* image);
@@ -54,8 +58,10 @@ enum png_chunk_type read_png_chunk_type(FILE* file);
 
 int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_info* image_info);
 int read_plte_chunk(FILE* file, struct png_info* image_info, int chunk_length);
-int read_idat_chunk(FILE* file, struct image_data* image, struct png_info* image_info);
+int read_idat_chunk(FILE* file, struct png_info* image_info, unsigned int chunk_length);
 int read_and_ignore_data(FILE* file, unsigned int bytes);
+
+int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, char** decompressed_data, uLongf* dest_len);
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte);
 

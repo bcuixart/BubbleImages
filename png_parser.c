@@ -3,6 +3,11 @@
 int parse_png(FILE* file, struct image_data* image)
 {
     struct png_info image_info;
+    image_info.has_palette = 0;
+    image_info.read_first_idat_chunk = 0;
+
+    image_info.data_stream = NULL;
+    image_info.data_total_size = 0;
 
     enum png_chunk_type chunk_type;
     do
@@ -11,7 +16,15 @@ int parse_png(FILE* file, struct image_data* image)
     } while (chunk_type != IEND && chunk_type != ReadError && chunk_type != IncorrectFormat);
 	
     if (chunk_type == IncorrectFormat) printf("Unsupported PNG format.\n");
-	return (chunk_type == ReadError || chunk_type == IncorrectFormat) ? -1 : 0;
+	if (chunk_type == ReadError || chunk_type == IncorrectFormat) return -1;
+
+    printf("Read PNG. Decompressing...\n");
+
+    char* decompressed_data = NULL;
+    uLongf dest_len = 0;
+    if (uncompress_zlib_data_stream(&image_info, image, &decompressed_data, &dest_len) == -1) return -1;
+
+    return 0;
 }
 
 enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
@@ -34,7 +47,7 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
             if (read_and_ignore_data(file, chunk_data_length) == -1) return ReadError;
             break;
         case IDAT:
-            result = read_idat_chunk(file, image, image_info);
+            result = read_idat_chunk(file, image_info, chunk_data_length);
             if (result == -1) return ReadError;
             if (result == -2) return IncorrectFormat;
             break;
@@ -163,17 +176,57 @@ int read_plte_chunk(FILE* file, struct png_info* image_info, int chunk_length)
     return 0;
 }
 
-int read_idat_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
+int read_idat_chunk(FILE* file, struct png_info* image_info, unsigned int chunk_length)
 {
     if (image_info->color_type == 3 && !image_info->has_palette) return -2; // If color type is 3, a palette must have been defined
     image_info->read_first_idat_chunk = 1;
+
+    unsigned int new_total_size = image_info->data_total_size + chunk_length;
+    unsigned int offset = image_info->data_total_size;
+
+    unsigned char* new_data_stream = realloc(image_info->data_stream, new_total_size);
+    if (!new_data_stream) return -1;
+    image_info->data_stream = new_data_stream;
+
+    if (fread(image_info->data_stream + offset, 1, chunk_length, file) != chunk_length) return -1;
+
+    image_info->data_total_size = new_total_size;
 
     return 0;
 }
 
 int read_and_ignore_data(FILE* file, unsigned int bytes)
 {
-    for (int i = 0; i < bytes; ++i) if(getc(file) == -1) return -1;
+    char buff[bytes];
+    if (fread(buff, 1, bytes, file) != bytes) return -1;
+
+    return 0;
+}
+
+// TO DO: Make own uncompressor
+int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, char** decompressed_data, uLongf* dest_len)
+{
+    unsigned int bits_per_pixel;
+    if (image_info->color_type == 0) bits_per_pixel = image_info->bit_depth; // Single grayscale color
+    else if (image_info->color_type == 2) bits_per_pixel = image_info->bit_depth * 3; // RGB values
+    else if (image_info->color_type == 3) bits_per_pixel = image_info->bit_depth; // Palette index
+    else if (image_info->color_type == 4) bits_per_pixel = image_info->bit_depth * 2; // Grayscale + alpha
+    else if (image_info->color_type == 6) bits_per_pixel = image_info->bit_depth * 4; // RGBA values
+
+    int bytes_per_pixel = (bits_per_pixel + 7) / 8; // + 7 to round up
+    int bytes_per_scanline = (image->width * bytes_per_pixel);
+    unsigned int expected_size = image->height * (bytes_per_scanline + 1);;
+
+    *decompressed_data = malloc(expected_size);
+    if (!*decompressed_data) return -1;
+
+    *dest_len = expected_size;
+    int result = uncompress(*decompressed_data, dest_len, image_info->data_stream, image_info->data_total_size); // Cheating!
+
+    if (result != Z_OK) {
+        free(*decompressed_data);
+        return -1;
+    }
 
     return 0;
 }
