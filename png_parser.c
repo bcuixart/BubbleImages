@@ -24,6 +24,12 @@ int parse_png(FILE* file, struct image_data* image)
     uLongf dest_len = 0;
     if (uncompress_zlib_data_stream(&image_info, image, &decompressed_data, &dest_len) == -1) return -1;
 
+    printf("Decompressed PNG. Unfiltering...\n");
+    if (unfilter_data_stream(&image_info, image, decompressed_data, dest_len) == -1) return -1;
+
+    printf("Filtered PNG. Reading pixels...\n");
+    if (fill_rgb_matrix(&image_info, image, decompressed_data, dest_len) == -1) return -1;
+
     return 0;
 }
 
@@ -133,20 +139,34 @@ int read_ihdr_chunk(FILE* file, struct image_data* image, struct png_info* image
     image_info->filter_method = filter_method;
     image_info->interlace_method = interlace_method;
 
-    printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\n", bit_depth, color_type, compression_method, filter_method, interlace_method);
 
     if (color_type == 1 || color_type == 5 || color_type > 6) return -2; // Non-existent formats
 
     if (color_type == 0) {
         if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
+        image_info->bits_per_pixel = bit_depth; // Single grayscale color
     }
-    else if (color_type == 2 || color_type == 4 || color_type == 6) {
+    else if (color_type == 2) {
         if (bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
+        image_info->bits_per_pixel = bit_depth * 3; // RGB values
     }
-    if (color_type == 3) {
+    else if (color_type == 3) {
         if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 && bit_depth != 8) return -2; // Non-existent formats
+        image_info->bits_per_pixel = bit_depth; // Palette index
+    }
+    else if (color_type == 4) {
+        if (bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
+        image_info->bits_per_pixel = bit_depth * 2; // Grayscale + alpha
+    }
+    else if (color_type == 6) {
+        if (bit_depth != 8 && bit_depth != 16) return -2; // Non-existent formats
+        image_info->bits_per_pixel = bit_depth * 4; // RGBA values
     }
 
+    image_info->bytes_per_pixel = (image_info->bits_per_pixel + 7) / 8; // + 7 to round up
+
+    printf("Bit depth: %d\nColor type: %d\nCompression method: %d\nFilter method: %d\nInterlace method:%d\nBits per pixel:%d\nBytes per pixel:%d\n", bit_depth, color_type, compression_method, filter_method, interlace_method, image_info->bits_per_pixel, image_info->bytes_per_pixel);
+    
     if (compression_method != 0 || filter_method != 0) return -2; // Invalid values, must be 0
     if (interlace_method != 0 && interlace_method != 1) return -2; // Invalid values, must be 0 or 1
 
@@ -206,16 +226,8 @@ int read_and_ignore_data(FILE* file, unsigned int bytes)
 // TO DO: Make own uncompressor
 int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, char** decompressed_data, uLongf* dest_len)
 {
-    unsigned int bits_per_pixel;
-    if (image_info->color_type == 0) bits_per_pixel = image_info->bit_depth; // Single grayscale color
-    else if (image_info->color_type == 2) bits_per_pixel = image_info->bit_depth * 3; // RGB values
-    else if (image_info->color_type == 3) bits_per_pixel = image_info->bit_depth; // Palette index
-    else if (image_info->color_type == 4) bits_per_pixel = image_info->bit_depth * 2; // Grayscale + alpha
-    else if (image_info->color_type == 6) bits_per_pixel = image_info->bit_depth * 4; // RGBA values
-
-    int bytes_per_pixel = (bits_per_pixel + 7) / 8; // + 7 to round up
-    int bytes_per_scanline = (image->width * bytes_per_pixel);
-    unsigned int expected_size = image->height * (bytes_per_scanline + 1);;
+    int bytes_per_scanline = image->width * image_info->bytes_per_pixel + 1;
+    unsigned int expected_size = image->height * bytes_per_scanline;
 
     *decompressed_data = malloc(expected_size);
     if (!*decompressed_data) return -1;
@@ -226,6 +238,91 @@ int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* 
     if (result != Z_OK) {
         free(*decompressed_data);
         return -1;
+    }
+
+    return 0;
+}
+
+int unfilter_data_stream(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+{
+    int bytes_per_scanline = image->width * image_info->bytes_per_pixel + 1;
+
+    for (int i = 0; i < image->height; ++i)
+    {
+        unsigned char unfilter_index = decompressed_data[i * bytes_per_scanline];
+        printf("Scanline filter type: %d\n", unfilter_index);
+
+        switch (unfilter_index)
+        {
+        case 1:
+            if (unfilter_type_sub(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            break;
+        case 2:
+            if (unfilter_type_up(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            break;
+        case 3:
+            if (unfilter_type_average(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            break;
+        case 4:
+            if (unfilter_type_paeth(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            break;
+        }
+    }
+
+    return 0;
+}
+
+int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+{
+    int offset = line_index * bytes_per_scanline;
+
+    for (int j = bytes_per_pixel + 1; j < bytes_per_scanline; ++j)
+    {
+        decompressed_data[offset + j] += decompressed_data[offset + j - bytes_per_pixel];
+    }
+
+    return 0;
+}
+
+int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+{
+    return 0;
+}
+
+int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+{
+    return 0;
+}
+
+int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+{
+    return 0;
+}
+
+
+int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+{
+    int decompressed_data_byte_index = 0;
+    for (int i = 0; i < image->height; ++i)
+    {
+        // To account for filter type byte
+        decompressed_data_byte_index++;
+
+        for (int j = 0; j < image->width; ++j)
+        {
+            unsigned char r = decompressed_data[decompressed_data_byte_index++];
+            unsigned char g = decompressed_data[decompressed_data_byte_index++];
+            unsigned char b = decompressed_data[decompressed_data_byte_index++];
+
+            image->pixel_rgb_matrix[i * image->width + j].r = r;
+            image->pixel_rgb_matrix[i * image->width + j].g = g;
+            image->pixel_rgb_matrix[i * image->width + j].b = b;
+
+            printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
+        }
+
+        // TO REMOVE, TO TEST FIRST LINE!
+        return 0;
     }
 
     return 0;
