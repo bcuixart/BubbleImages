@@ -250,21 +250,21 @@ int unfilter_data_stream(struct png_info* image_info, struct image_data* image, 
     for (int i = 0; i < image->height; ++i)
     {
         unsigned char unfilter_index = decompressed_data[i * bytes_per_scanline];
-        printf("Scanline filter type: %d\n", unfilter_index);
+        //printf("Scanline filter type: %d\n", unfilter_index);
 
         switch (unfilter_index)
         {
         case 1:
-            if (unfilter_type_sub(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            if (unfilter_type_sub(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, i) == -1) return -1;
             break;
         case 2:
-            if (unfilter_type_up(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            if (unfilter_type_up(decompressed_data, bytes_per_scanline, i) == -1) return -1;
             break;
         case 3:
-            if (unfilter_type_average(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            if (unfilter_type_average(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, i) == -1) return -1;
             break;
         case 4:
-            if (unfilter_type_paeth(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, image->height, i) == -1) return -1;
+            if (unfilter_type_paeth(decompressed_data, bytes_per_scanline, image_info->bytes_per_pixel, i) == -1) return -1;
             break;
         }
     }
@@ -272,7 +272,7 @@ int unfilter_data_stream(struct png_info* image_info, struct image_data* image, 
     return 0;
 }
 
-int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
     int offset = line_index * bytes_per_scanline;
 
@@ -284,21 +284,62 @@ int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes
     return 0;
 }
 
-int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int line_index)
 {
+    if (line_index <= 0) return 0; // Does not apply to first line
+
+    int offset = line_index * bytes_per_scanline;
+    int offset_prev_line = (line_index - 1) * bytes_per_scanline;
+
+    for (int j = 1; j < bytes_per_scanline; ++j)
+    {
+        decompressed_data[offset + j] += decompressed_data[offset_prev_line + j];
+    }
+
     return 0;
 }
 
-int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
+    int offset = line_index * bytes_per_scanline;
+    int offset_prev_line = (line_index - 1) * bytes_per_scanline;
+
+    for (int j = 1; j < bytes_per_scanline; ++j)
+    {
+        unsigned char left = (j >= (bytes_per_pixel + 1)) ? decompressed_data[offset + j - bytes_per_pixel] : 0;
+        unsigned char up = (line_index > 0) ? decompressed_data[offset_prev_line + j] : 0;
+
+        decompressed_data[offset + j] += (left + up) / 2;
+    }
+
     return 0;
 }
 
-int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int height, int line_index)
+int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
+    int offset = line_index * bytes_per_scanline;
+    int offset_prev_line = (line_index - 1) * bytes_per_scanline;
+
+    for (int j = 1; j < bytes_per_scanline; ++j)
+    {
+        unsigned char left = (j >= (bytes_per_pixel + 1)) ? decompressed_data[offset + j - bytes_per_pixel] : 0;
+        unsigned char up = (line_index > 0) ? decompressed_data[offset_prev_line + j] : 0;
+        unsigned char up_left = (j >= (bytes_per_pixel + 1) && line_index > 0) ? decompressed_data[offset_prev_line + j - bytes_per_pixel] : 0;
+
+        int p = left + up - up_left;
+        int p_left = abs(p - left);
+        int p_up = abs(p - up);
+        int p_up_left = abs(p - up_left);
+
+        if (p_left <= p_up && p_left <= p_up_left) p = left;
+        else if (p_up <= p_up_left) p = up;
+        else p = up_left;
+
+        decompressed_data[offset + j] += p;
+    }
+
     return 0;
 }
-
 
 int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
 {
@@ -318,11 +359,8 @@ int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char*
             image->pixel_rgb_matrix[i * image->width + j].g = g;
             image->pixel_rgb_matrix[i * image->width + j].b = b;
 
-            printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
+            //printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
         }
-
-        // TO REMOVE, TO TEST FIRST LINE!
-        return 0;
     }
 
     return 0;

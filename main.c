@@ -26,7 +26,6 @@ int main(int argc, char** argv)
 	struct image_data read_image_data;
 	if (read_image(argv[1], &read_image_data) == -1) error_and_exit("Loading image", 7);
 
-	/*
 	struct image_data smaller_image_data;
 	char buff[128];
 	for (int i = 0; i < 10; ++i)
@@ -38,7 +37,6 @@ int main(int argc, char** argv)
 		if (save_image_as_ppm(&smaller_image_data, buff) == -1) error_and_exit("Saving smaller image", 9);
 		free(smaller_image_data.pixel_rgb_matrix);
 	}
-	*/
 
 	free(read_image_data.pixel_rgb_matrix);
 }
