@@ -64,7 +64,7 @@ int parse_ppm_p3_pixel_data(FILE* file, struct image_data* image, int maxcolorva
 			image->pixel_rgb_matrix[i * image->width + j].g = g;
 			image->pixel_rgb_matrix[i * image->width + j].b = b;
 
-			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", i, j, r, g, b);
+			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
 		}
 	}
 
@@ -85,7 +85,7 @@ int parse_ppm_p6_pixel_data(FILE* file, struct image_data* image, int maxcolorva
 			image->pixel_rgb_matrix[i * image->width + j].g = g;
 			image->pixel_rgb_matrix[i * image->width + j].b = b;
 
-			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", i, j, r, g, b);
+			//printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
 		}
 	}
 
