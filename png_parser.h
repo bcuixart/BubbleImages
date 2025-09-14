@@ -74,6 +74,12 @@ int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int byt
 
 int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 
+int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_palette(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+
 unsigned char get_fifth_bit_from_byte(unsigned char byte);
 
 #endif
