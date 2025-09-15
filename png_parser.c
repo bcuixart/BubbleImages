@@ -18,23 +18,23 @@ int parse_png(FILE* file, struct image_data* image)
     if (chunk_type == IncorrectFormat) printf("Unsupported PNG format.\n");
 	if (chunk_type == ReadError || chunk_type == IncorrectFormat) return -1;
 
-    printf("Read PNG. Decompressing...\n");
+    //printf("Read PNG. Decompressing...\n");
 
     char* decompressed_data = NULL;
     uLongf dest_len = 0;
     if (uncompress_zlib_data_stream(&image_info, image, &decompressed_data, &dest_len) == -1) return -1;
 
-    printf("Decompressed PNG. Unfiltering...\n");
+    //printf("Decompressed PNG. Unfiltering...\n");
     if (unfilter_data_stream(&image_info, image, decompressed_data, dest_len) == -1) return -1;
 
-    printf("Filtered PNG. Reading pixels...\n");
+    //printf("Filtered PNG. Reading pixels...\n");
     if (fill_rgb_matrix(&image_info, image, decompressed_data, dest_len) == -1) {
         if (image_info.palette.colors) free(image_info.palette.colors);
         free(decompressed_data);
         return -1;
     }
 
-    printf("Correctly read.\n");
+    //printf("Correctly read.\n");
 
     if (image_info.palette.colors) free(image_info.palette.colors);
     if (decompressed_data) free(decompressed_data);
@@ -45,10 +45,10 @@ int parse_png(FILE* file, struct image_data* image)
 enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
 {
     unsigned int chunk_data_length = read_four_byte_integer(file);
-	printf("Chunk data length: %d\n", chunk_data_length);
+	//printf("Chunk data length: %d\n", chunk_data_length);
 
     enum png_chunk_type chunk_type = read_png_chunk_type(file);
-    printf("Chunk type: %d\n", chunk_type);
+    //printf("Chunk type: %d\n", chunk_type);
 
     int result;
     switch (chunk_type) 
@@ -86,7 +86,7 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
     }
         
     unsigned int chunk_crc = read_four_byte_integer(file);
-    printf("Chunk crc: %d\n\n", chunk_crc);
+    //printf("Chunk crc: %d\n\n", chunk_crc);
 
     return chunk_type;
 }
