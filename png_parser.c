@@ -28,9 +28,16 @@ int parse_png(FILE* file, struct image_data* image)
     if (unfilter_data_stream(&image_info, image, decompressed_data, dest_len) == -1) return -1;
 
     printf("Filtered PNG. Reading pixels...\n");
-    if (fill_rgb_matrix(&image_info, image, decompressed_data, dest_len) == -1) return -1;
+    if (fill_rgb_matrix(&image_info, image, decompressed_data, dest_len) == -1) {
+        if (image_info.palette.colors) free(image_info.palette.colors);
+        free(decompressed_data);
+        return -1;
+    }
 
     printf("Correctly read.\n");
+
+    if (image_info.palette.colors) free(image_info.palette.colors);
+    if (decompressed_data) free(decompressed_data);
 
     return 0;
 }
@@ -188,6 +195,7 @@ int read_plte_chunk(FILE* file, struct png_info* image_info, int chunk_length)
     image_info->has_palette = 1;
     image_info->palette.number_of_colors = number_of_colors;
     image_info->palette.colors = malloc(number_of_colors * sizeof(struct png_palette_color));
+    if (!image_info->palette.colors) return -1;
 
     for (int i = 0; i < number_of_colors; ++i)
     {
@@ -349,13 +357,15 @@ int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char*
     switch (image_info->color_type)
     {
     case 0:
-        return fill_rgb_matrix_grayscale(image_info, image, decompressed_data, decompressed_data_length);
+        if (image_info->bit_depth == 8 || image_info->bit_depth == 16) return fill_rgb_matrix_grayscale_8_16(image_info, image, decompressed_data, decompressed_data_length);
+        else return fill_rgb_matrix_grayscale_1_2_4(image_info, image, decompressed_data, decompressed_data_length);
         break;
     case 2:
         return fill_rgb_matrix_rgb(image_info, image, decompressed_data, decompressed_data_length);
         break;    
     case 3:
-        return fill_rgb_matrix_palette(image_info, image, decompressed_data, decompressed_data_length);
+        if (image_info->bit_depth == 8) return fill_rgb_matrix_palette_8(image_info, image, decompressed_data, decompressed_data_length);
+        else return fill_rgb_matrix_palette_1_2_4(image_info, image, decompressed_data, decompressed_data_length);
         break;
     case 4:
         return fill_rgb_matrix_grayscale_alpha(image_info, image, decompressed_data, decompressed_data_length);
@@ -469,8 +479,87 @@ int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* im
     return 0;
 }
 
-int fill_rgb_matrix_grayscale(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
 {
+    int decompressed_data_byte_index = 0;
+    for (int i = 0; i < image->height; ++i)
+    {
+        // To account for filter type byte
+        decompressed_data_byte_index++;
+
+        for (int j = 0; j < image->width; ++j)
+        {
+            unsigned int gs;
+
+            if (image_info->bit_depth == 8)
+            {
+                gs = decompressed_data[decompressed_data_byte_index++];
+            }
+            else if (image_info->bit_depth == 16)
+            {
+                unsigned char gs2;
+
+                gs = decompressed_data[decompressed_data_byte_index++];
+                gs2 = decompressed_data[decompressed_data_byte_index++];
+
+                gs = (gs2 * 256 + gs) / 255;
+            }
+
+            image->pixel_rgb_matrix[i * image->width + j].r = (unsigned char)gs;
+            image->pixel_rgb_matrix[i * image->width + j].g = (unsigned char)gs;
+            image->pixel_rgb_matrix[i * image->width + j].b = (unsigned char)gs;
+
+            //printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
+        }
+    }
+
+    return 0;
+}
+
+int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+{
+    int decompressed_data_byte_index = 0;
+    for (int i = 0; i < image->height; ++i)
+    {
+        // To account for filter type byte
+        decompressed_data_byte_index++;
+
+        int bits_read = 0;
+        for (int j = 0; j < image->width; ++j)
+        {
+            int byte_offset = decompressed_data_byte_index + bits_read / 8;
+            int bit_offset = bits_read % 8;
+
+            unsigned char byte = decompressed_data[byte_offset];
+            unsigned char gs;
+
+            switch (image_info->bit_depth)
+            {
+            case 1:
+                gs = (byte >> (7 - bit_offset)) & 0x01;
+                gs = gs * 255;
+                bits_read += 1;
+                break;
+            case 2:
+                gs = (gs >> (6 - bit_offset)) & 0x03;
+                gs = (gs * 255) / 3;
+                bits_read += 2;
+                break;
+            case 4:
+                gs = (byte >> (4 - bit_offset)) & 0x0F;
+                gs = (gs * 255) / 15;
+                bits_read += 4;
+                break;
+            }
+
+            image->pixel_rgb_matrix[i * image->width + j].r = gs;
+            image->pixel_rgb_matrix[i * image->width + j].g = gs;
+            image->pixel_rgb_matrix[i * image->width + j].b = gs;
+        }
+
+        decompressed_data_byte_index += (image->width * image_info->bit_depth + 7) / 8;
+    }
+
     return 0;
 }
 
@@ -516,8 +605,74 @@ int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_da
     return 0;
 }
 
-int fill_rgb_matrix_palette(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
 {
+    int decompressed_data_byte_index = 0;
+    for (int i = 0; i < image->height; ++i)
+    {
+        // To account for filter type byte
+        decompressed_data_byte_index++;
+
+        for (int j = 0; j < image->width; ++j)
+        {
+            unsigned char palette_index = decompressed_data[decompressed_data_byte_index++];
+
+            image->pixel_rgb_matrix[i * image->width + j].r = image_info->palette.colors[palette_index].r;
+            image->pixel_rgb_matrix[i * image->width + j].g = image_info->palette.colors[palette_index].g;
+            image->pixel_rgb_matrix[i * image->width + j].b = image_info->palette.colors[palette_index].b;
+
+            //printf("Pixel (%d, %d): RGB = (%d, %d, %d)\n", j, i, r, g, b);
+        }
+    }
+
+    return 0;
+}
+
+int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+{
+    int decompressed_data_byte_index = 0;
+    for (int i = 0; i < image->height; ++i)
+    {
+        // To account for filter type byte
+        decompressed_data_byte_index++;
+
+        int bits_read = 0;
+        for (int j = 0; j < image->width; ++j)
+        {
+            int byte_offset = decompressed_data_byte_index + bits_read / 8;
+            int bit_offset = bits_read % 8;
+
+            unsigned char byte = decompressed_data[byte_offset];
+            unsigned char palette_index;
+
+            switch (image_info->bit_depth)
+            {
+            case 1:
+                palette_index = (byte >> (7 - bit_offset)) & 0x01;
+                bits_read += 1;
+                break;
+            case 2:
+                palette_index = (byte >> (6 - bit_offset)) & 0x03;
+                bits_read += 2;
+                break;
+            case 4:
+                palette_index = (byte >> (4 - bit_offset)) & 0x0F;
+                bits_read += 4;
+                break;
+            default:
+                return -1;
+            }
+
+            if (palette_index >= image_info->palette.number_of_colors) return -1;
+
+            image->pixel_rgb_matrix[i * image->width + j].r = image_info->palette.colors[palette_index].r;
+            image->pixel_rgb_matrix[i * image->width + j].g = image_info->palette.colors[palette_index].g;
+            image->pixel_rgb_matrix[i * image->width + j].b = image_info->palette.colors[palette_index].b;
+        }
+
+        decompressed_data_byte_index += (image->width * image_info->bit_depth + 7) / 8;
+    }
+
     return 0;
 }
 

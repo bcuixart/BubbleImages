@@ -76,9 +76,11 @@ int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char*
 
 int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_grayscale(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_palette(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte);
 
