@@ -28,6 +28,7 @@ enum ImageType {
 #include "ppm_parser.h"
 
 int read_image(char* filename, struct image_data* result);
+int save_image_as_png(struct image_data* data, char* filename);
 int save_image_as_ppm(struct image_data* data, char* filename);
 
 enum ImageType get_image_type_from_file(FILE* file);

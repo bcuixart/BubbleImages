@@ -20,6 +20,11 @@ int read_image(char* filename, struct image_data* result)
 	if (fclose(file) == -1) return -1;
 }
 
+int save_image_as_png(struct image_data* data, char* filename)
+{
+	return save_png(data, filename);
+}
+
 int save_image_as_ppm(struct image_data* data, char* filename)
 {
 	return save_ppm(data, filename);

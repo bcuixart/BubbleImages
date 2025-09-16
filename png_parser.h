@@ -53,6 +53,7 @@ struct png_info {
 };
 
 int parse_png(FILE* file, struct image_data* image);
+int save_png(struct image_data* image, char* filename);
 
 enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_info* image_info);
 
@@ -81,6 +82,13 @@ int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_da
 int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
 int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+
+int write_png_ihdr_chunk(struct image_data* image, int fd);
+int write_png_iend_chunk(struct image_data* image, int fd);
+int write_png_idat_chunks(struct image_data* image, int fd);
+int write_png_idat_chunk(Bytef* compressed_data, int fd, int byte_start, int bytes_to_write);
+
+int get_png_data_stream(struct image_data* image, char* image_data_stream);
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte);
 

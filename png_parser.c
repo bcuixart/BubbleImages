@@ -42,6 +42,23 @@ int parse_png(FILE* file, struct image_data* image)
     return 0;
 }
 
+int save_png(struct image_data* image, char* filename)
+{
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) return -1;
+
+    // Signature
+    if (write(fd, "\211PNG\r\n\032\n", 8) == -1) return -1;
+
+    if (write_png_ihdr_chunk(image, fd) == -1) return -1;
+    if (write_png_idat_chunks(image, fd) == -1) return -1;
+    if (write_png_iend_chunk(image, fd) == -1) return -1;
+
+    if (close(fd) == -1) return -1;
+
+    return 0;
+}
+
 enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct png_info* image_info)
 {
     unsigned int chunk_data_length = read_four_byte_integer(file);
@@ -111,10 +128,10 @@ enum png_chunk_type read_png_chunk_type(FILE* file)
     if (fread(buff, 1, 4, file) != 4) return ReadError;
     buff[4] = '\0';
 
-    if (strcmp(buff, "IDAT") == 0) return IDAT;
-    if (strcmp(buff, "IHDR") == 0) return IHDR;
-    if (strcmp(buff, "IEND") == 0) return IEND;
-    if (strcmp(buff, "PLTE") == 0) return PLTE;
+    if (memcmp(buff, "IDAT", 4) == 0) return IDAT;
+    if (memcmp(buff, "IHDR", 4) == 0) return IHDR;
+    if (memcmp(buff, "IEND", 4) == 0) return IEND;
+    if (memcmp(buff, "PLTE", 4) == 0) return PLTE;
 
     if (get_fifth_bit_from_byte(buff[0]) == 1) return Ancillary; // Ancillary chunk (not needed to display image, must ignore)
     if (get_fifth_bit_from_byte(buff[1]) == 1) return Private; // Private chunk (use not defined by standard, should ignore)
@@ -541,7 +558,7 @@ int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_da
                 bits_read += 1;
                 break;
             case 2:
-                gs = (gs >> (6 - bit_offset)) & 0x03;
+                gs = (byte >> (6 - bit_offset)) & 0x03;
                 gs = (gs * 255) / 3;
                 bits_read += 2;
                 break;
@@ -676,6 +693,131 @@ int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data
     return 0;
 }
 
+int write_png_ihdr_chunk(struct image_data* image, int fd)
+{
+    char chunk_size_buff[4] = { 0, 0, 0, 0x0D };
+    if (write(fd, chunk_size_buff, 4) == -1) return -1;
+
+    // Bit depth = 8, Color type = 2, Compression = Filter = Interlace = 0
+    unsigned char chunk_crc_buff[17] = {'I', 'H', 'D', 'R', 0, 0, 0, 0, 0, 0, 0, 0, 8, 2, 0, 0, 0 }; 
+
+    chunk_crc_buff[4] = (image->width >> 24) & 0xFF;
+    chunk_crc_buff[5] = (image->width >> 16) & 0xFF;
+    chunk_crc_buff[6] = (image->width >> 8) & 0xFF;
+    chunk_crc_buff[7] = image->width & 0xFF;
+    chunk_crc_buff[8] = (image->height >> 24) & 0xFF;
+    chunk_crc_buff[9] = (image->height >> 16) & 0xFF;
+    chunk_crc_buff[10] = (image->height >> 8) & 0xFF;
+    chunk_crc_buff[11] = image->height & 0xFF;
+
+    if (write(fd, chunk_crc_buff, 17) == -1) return -1;
+
+    uLong crc_val = crc32(0L, Z_NULL, 0);
+    crc_val = crc32(crc_val, chunk_crc_buff, 17);
+
+    unsigned char crc_bytes[4];
+    crc_bytes[0] = (crc_val >> 24) & 0xFF;
+    crc_bytes[1] = (crc_val >> 16) & 0xFF;
+    crc_bytes[2] = (crc_val >> 8) & 0xFF;
+    crc_bytes[3] = crc_val & 0xFF;
+
+    if (write(fd, crc_bytes, 4) == -1) return -1;
+    return 0;
+}
+
+int write_png_iend_chunk(struct image_data* image, int fd)
+{
+    char buff[12] = { 0, 0, 0, 0, 'I', 'E', 'N', 'D', 0xAE, 0x42, 0x60, 0x82 };
+    if (write(fd, buff, 12) == -1) return -1;
+
+    return 0;
+}
+
+int write_png_idat_chunks(struct image_data* image, int fd)
+{
+    int raw_size = image->height * (image->width * 3 + 1);
+    char* image_data_stream = malloc(raw_size);
+    if (!image_data_stream) return -1;
+
+    if (get_png_data_stream(image, image_data_stream) == -1) {
+        free(image_data_stream);
+        return -1;
+    }
+
+    uLongf compressed_size = compressBound(raw_size); // Get maximum size
+    Bytef* compressed_data = malloc(compressed_size);
+    if (!compressed_data) {
+        free(image_data_stream);
+        return -1;
+    }
+
+    int res = compress(compressed_data, &compressed_size, (Bytef*)image_data_stream, raw_size);
+    if (image_data_stream) free(image_data_stream);
+
+    if (res != Z_OK) {
+        free(compressed_data);
+        return -1;
+    }
+
+    if (write_png_idat_chunk(compressed_data, fd, 0, compressed_size) == -1) {
+        free(compressed_data);
+        return -1;
+    }
+
+    if (compressed_data) free(compressed_data);
+    return 0;
+}
+
+int write_png_idat_chunk(Bytef* compressed_data, int fd, int byte_start, int bytes_to_write)
+{
+    char size_buff[4];
+    size_buff[0] = (bytes_to_write >> 24) & 0xFF;
+    size_buff[1] = (bytes_to_write >> 16) & 0xFF;
+    size_buff[2] = (bytes_to_write >> 8) & 0xFF;
+    size_buff[3] = bytes_to_write & 0xFF;
+
+    if (write(fd, size_buff, 4) == -1) return -1;
+
+    unsigned char chunk_crc_buff[4 + bytes_to_write];
+    chunk_crc_buff[0] = 'I';
+    chunk_crc_buff[1] = 'D';
+    chunk_crc_buff[2] = 'A';
+    chunk_crc_buff[3] = 'T';
+
+    for (int i = 0; i < bytes_to_write; ++i) chunk_crc_buff[4 + i] = compressed_data[byte_start + i];
+    if (write(fd, chunk_crc_buff, 4 + bytes_to_write) == -1) return -1;
+
+    uLong crc_val = crc32(0L, Z_NULL, 0);
+    crc_val = crc32(crc_val, chunk_crc_buff, 4 + bytes_to_write);
+
+    unsigned char crc_bytes[4];
+    crc_bytes[0] = (crc_val >> 24) & 0xFF;
+    crc_bytes[1] = (crc_val >> 16) & 0xFF;
+    crc_bytes[2] = (crc_val >> 8) & 0xFF;
+    crc_bytes[3] = crc_val & 0xFF;
+
+    if (write(fd, crc_bytes, 4) == -1) return -1;
+
+    return 0;
+}
+
+int get_png_data_stream(struct image_data* image, char* image_data_stream)
+{
+    int bytes_per_scanline = image->width * 3 + 1;
+
+    for (int i = 0; i < image->height; ++i)
+    {
+        image_data_stream[i * bytes_per_scanline] = 0; // No filtering
+        for (int j = 0; j < image->width; ++j)
+        {
+            image_data_stream[i * bytes_per_scanline + 1 + j * 3 + 0] = image->pixel_rgb_matrix[i * image->width + j].r;
+            image_data_stream[i * bytes_per_scanline + 1 + j * 3 + 1] = image->pixel_rgb_matrix[i * image->width + j].g;
+            image_data_stream[i * bytes_per_scanline + 1 + j * 3 + 2] = image->pixel_rgb_matrix[i * image->width + j].b;
+        }
+    }
+
+    return 0;
+}
 
 unsigned char get_fifth_bit_from_byte(unsigned char byte)
 {

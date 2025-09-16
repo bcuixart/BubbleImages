@@ -31,10 +31,11 @@ int main(int argc, char** argv)
 	for (int i = 0; i < 10; ++i)
 	{
 		int power_of_two = (1 << i);
-		sprintf(buff, "output/Output%d.ppm", i);
+		sprintf(buff, "output/Output%d.png", i);
 
 		if (get_smaller_image_data(&read_image_data, &smaller_image_data, power_of_two, power_of_two) == -1) error_and_exit("Making smaller image", 8);
-		if (save_image_as_ppm(&smaller_image_data, buff) == -1) error_and_exit("Saving smaller image", 9);
+		//if (save_image_as_ppm(&smaller_image_data, buff) == -1) error_and_exit("Saving smaller image", 9);
+		if (save_image_as_png(&smaller_image_data, buff) == -1) error_and_exit("Saving smaller image", 9);
 		free(smaller_image_data.pixel_rgb_matrix);
 	}
 
