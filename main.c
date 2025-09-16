@@ -6,6 +6,7 @@
 #include <errno.h>
 
 #include "image.h"
+#include "game.h"
 
 void usage()
 {
@@ -44,17 +45,24 @@ int main(int argc, char** argv)
 	}
 	else if (strcmp(argv[1], "-g") == 0)
 	{
-		struct image_data smaller_images_matrix[10];
-		for (int i = 0; i < 10; ++i)
+		struct image_data smaller_images_matrix[GAME_LEVELS];
+		for (int i = 0; i < GAME_LEVELS; ++i)
 		{
 			int power_of_two = (1 << i);
 
 			if (get_smaller_image_data(&read_image_data, &smaller_images_matrix[i], power_of_two, power_of_two) == -1) error_and_exit("Making smaller image", 8);
 		}
 
-		printf("The game will eventually load here...\nPlease imagine it did.\n");
+		init_game_window();
+		load_image_matrix(smaller_images_matrix, GAME_LEVELS);
 
-		for (int i = 0; i < 10; ++i) free(smaller_images_matrix[i].pixel_rgb_matrix);
+		while (!should_close_game_window()) update_game();
+
+		close_game_window();
+
+		for (int i = 0; i < GAME_LEVELS; ++i) {
+			if (smaller_images_matrix[i].pixel_rgb_matrix) free(smaller_images_matrix[i].pixel_rgb_matrix);
+		}
 	}
 
 	if (read_image_data.pixel_rgb_matrix) free(read_image_data.pixel_rgb_matrix);
