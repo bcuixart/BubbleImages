@@ -31,6 +31,8 @@ void update_game()
 	int screen_width = GetScreenWidth();
 	int screen_height = GetScreenHeight();
 
+	float delta_time = GetFrameTime();
+
 	BeginDrawing();
 	ClearBackground(RAYWHITE);
 
@@ -64,6 +66,7 @@ void update_game()
 	struct game_image_node* list_iterator = nodes_list_first;
 	while (list_iterator != NULL)
 	{
+		animate_node(list_iterator, delta_time);
 		DrawCircleV(list_iterator->position, list_iterator->radius, list_iterator->color);
 
 		list_iterator = list_iterator->next;
@@ -73,19 +76,37 @@ void update_game()
 	EndDrawing();
 }
 
+void animate_node(struct game_image_node* node, float delta_time)
+{
+	if (node->can_be_pressed) return;
+
+	node->animation_lerp_value = min(node->animation_lerp_value + delta_time * ANIMATION_ACCELERATOR, 1.f);
+	node->radius = Lerp(node->animation_start_radius, node->animation_end_radius, node->animation_lerp_value);
+	node->position.x = Lerp(node->animation_start_position.x, node->animation_end_position.x, node->animation_lerp_value);
+	node->position.y = Lerp(node->animation_start_position.y, node->animation_end_position.y, node->animation_lerp_value);
+	node->color.r = Lerp(node->animation_start_color.r, node->animation_end_color.r, node->animation_lerp_value);
+	node->color.g = Lerp(node->animation_start_color.g, node->animation_end_color.g, node->animation_lerp_value);
+	node->color.b = Lerp(node->animation_start_color.b, node->animation_end_color.b, node->animation_lerp_value);
+
+	if (node->animation_lerp_value >= 1) node->can_be_pressed = 1;
+}
+
 void click_node(struct game_image_node* node)
 {
+	if (!node->can_be_pressed) return;
 	if (node->level >= game_smaller_images_level - 1) return;
 
 	int new_level = node->level + 1;
 	int new_level_color_matrix_width = (1 << new_level);
 	int new_radius = node->radius / 2;
+	int radius_start = node->radius;
 
 	struct game_image_node* n1 = malloc(sizeof(struct game_image_node));
 	struct game_image_node* n2 = malloc(sizeof(struct game_image_node));
 	struct game_image_node* n3 = malloc(sizeof(struct game_image_node));
 	//if (!n1 || !n2 || !n3) return -1;
 
+	Vector2 pos_start = node->position;
 	Vector2 pos0 = (Vector2){ node->position.x + new_radius, node->position.y + new_radius };
 	Vector2 pos1 = (Vector2){ node->position.x - new_radius, node->position.y + new_radius };
 	Vector2 pos2 = (Vector2){ node->position.x + new_radius, node->position.y - new_radius };
@@ -105,6 +126,7 @@ void click_node(struct game_image_node* node)
 	int idx2 = j2 * new_level_color_matrix_width + i2;
 	int idx3 = j3 * new_level_color_matrix_width + i3;
 
+	Color color_start = node->color;
 	Color color0 = (Color){ game_smaller_images_matrix[new_level].pixel_rgb_matrix[idx0].r,
 		game_smaller_images_matrix[new_level].pixel_rgb_matrix[idx0].g,
 		game_smaller_images_matrix[new_level].pixel_rgb_matrix[idx0].b, 255
@@ -122,10 +144,10 @@ void click_node(struct game_image_node* node)
 		game_smaller_images_matrix[new_level].pixel_rgb_matrix[idx3].b, 255
 	};
 
-	set_node_values(n1, color0, pos0, new_level, new_radius);
-	set_node_values(n2, color1, pos1, new_level, new_radius);
-	set_node_values(n3, color2, pos2, new_level, new_radius);
-	set_node_values(node, color3, pos3, new_level, new_radius);
+	set_node_values(n1, color_start, color0, pos_start, pos0, new_level, radius_start, new_radius);
+	set_node_values(n2, color_start, color1, pos_start, pos1, new_level, radius_start, new_radius);
+	set_node_values(n3, color_start, color2, pos_start, pos2, new_level, radius_start, new_radius);
+	set_node_values(node, color_start, color3, pos_start, pos3, new_level, radius_start, new_radius);
 
 	n3->next = node->next;
 	node->next = n1;
@@ -133,12 +155,21 @@ void click_node(struct game_image_node* node)
 	n2->next = n3;
 }
 
-void set_node_values(struct game_image_node* node, Color color, Vector2 position, int level, int radius)
+void set_node_values(struct game_image_node* node, Color color_start, Color color_end, Vector2 position_start, Vector2 position_end, int level, float radius_start, float radius_end)
 {
-	node->position = position;
+	node->position = position_start;
 	node->level = level;
-	node->radius = radius;
-	node->color = color;
+	node->radius = radius_start;
+	node->color = color_start;
+
+	node->can_be_pressed = 0;
+	node->animation_lerp_value = 0;
+	node->animation_start_radius = radius_start;
+	node->animation_start_position = position_start;
+	node->animation_start_color = color_start;
+	node->animation_end_radius = radius_end;
+	node->animation_end_position = position_end;
+	node->animation_end_color = color_end;
 }
 
 /*
@@ -207,7 +238,16 @@ void load_image_matrix(struct image_data* img_mtrx, int level)
 
 	nodes_list_first->level = 0;
 	nodes_list_first->radius = 128;
-	nodes_list_first->color = (Color){ img_mtrx[0].pixel_rgb_matrix[0].r,img_mtrx[0].pixel_rgb_matrix[0].g, img_mtrx[0].pixel_rgb_matrix[0].b, 255 };
+	nodes_list_first->color = (Color){ img_mtrx[0].pixel_rgb_matrix[0].r, img_mtrx[0].pixel_rgb_matrix[0].g, img_mtrx[0].pixel_rgb_matrix[0].b, 255 };
 	nodes_list_first->position = (Vector2){ 128, 128 };
 	nodes_list_first->next = NULL;
+
+	nodes_list_first->can_be_pressed = 0;
+	nodes_list_first->animation_lerp_value = 0;
+	nodes_list_first->animation_start_radius = 0;
+	nodes_list_first->animation_start_position = (Vector2){ 128, 128 };
+	nodes_list_first->animation_start_color = (Color){ 255, 255, 255, 255 };
+	nodes_list_first->animation_end_radius = 128;
+	nodes_list_first->animation_end_position = (Vector2){ 128, 128 };
+	nodes_list_first->animation_end_color = (Color){ img_mtrx[0].pixel_rgb_matrix[0].r, img_mtrx[0].pixel_rgb_matrix[0].g, img_mtrx[0].pixel_rgb_matrix[0].b, 255 };
 }
