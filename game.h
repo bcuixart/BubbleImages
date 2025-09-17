@@ -11,11 +11,13 @@
 #include <raymath.h>
 
 #include "image.h"
+#include "tinyfiledialogs.h"
 
 #define WINDOW_WIDTH 500
 #define WINDOW_HEIGHT 500
 
-#define GAME_LEVELS 8
+#define GAME_LEVELS 7
+#define ANIMATION_ACCELERATOR 5
 
 struct game_image_node 
 {
@@ -41,23 +43,13 @@ void init_game_window();
 void close_game_window();
 int should_close_game_window();
 
-void update_game();
+int update_game();
 
 void animate_node(struct game_image_node* node, float delta_time);
 
-void click_node(struct game_image_node* node);
+int click_node(struct game_image_node* node);
 void set_node_values(struct game_image_node* node, Color color_start, Color color_end, Vector2 position_start, Vector2 position_end, int level, float radius_start, float radius_end);
 
-void load_image_matrix(struct image_data* img_mtrx, int level);
-
-struct game_image_node* nodes_list_first;
-
-extern struct image_data* game_smaller_images_matrix;
-extern int game_smaller_images_level;
-extern int game_current_level;
-
-Camera2D camera;
-
-const float ANIMATION_ACCELERATOR = 5;
+int game_load_image_matrix(struct image_data* img_mtrx, int level);
 
 #endif

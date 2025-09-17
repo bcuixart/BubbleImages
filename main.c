@@ -54,9 +54,11 @@ int main(int argc, char** argv)
 		}
 
 		init_game_window();
-		load_image_matrix(smaller_images_matrix, GAME_LEVELS);
+		if (game_load_image_matrix(smaller_images_matrix, GAME_LEVELS) == -1) error_and_exit("Loading game matrix", 10);
 
-		while (!should_close_game_window()) update_game();
+		while (!should_close_game_window()) {
+			if (update_game() == -1) error_and_exit("Game", 6);
+		}
 
 		close_game_window();
 

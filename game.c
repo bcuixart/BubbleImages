@@ -1,8 +1,16 @@
 #include "game.h"
 
+// Private variables
 struct image_data* game_smaller_images_matrix;
+struct game_image_node* nodes_list_first;
+
 int game_smaller_images_level = 0;
 int game_current_level = 0;
+
+int total_nodes_to_click;
+int clicked_nodes;
+
+Camera2D camera = (Camera2D){ 0 };
 
 void init_game_window()
 {
@@ -26,7 +34,7 @@ int should_close_game_window()
 	return WindowShouldClose();
 }
 
-void update_game()
+int update_game()
 {
 	int screen_width = GetScreenWidth();
 	int screen_height = GetScreenHeight();
@@ -55,7 +63,7 @@ void update_game()
 			float dy = mouse_world.y - list_iterator->position.y;
 			if (sqrtf(dx * dx + dy * dy) <= list_iterator->radius)
 			{
-				click_node(list_iterator);
+				if (click_node(list_iterator) == -1) return -1;
 				break;
 			}
 
@@ -72,8 +80,15 @@ void update_game()
 		list_iterator = list_iterator->next;
 	}
 
+	Vector2 bar_position = GetScreenToWorld2D((Vector2) { 0, 10 }, camera);
+	DrawRectangle(0, bar_position.y, 256, 10, RED);
+	int bar_length = (int)(((float)clicked_nodes / (float)total_nodes_to_click) * 256.f);
+	DrawRectangle(0, bar_position.y, bar_length, 10, GREEN);
+
 	EndMode2D();
 	EndDrawing();
+
+	return 0;
 }
 
 void animate_node(struct game_image_node* node, float delta_time)
@@ -91,10 +106,10 @@ void animate_node(struct game_image_node* node, float delta_time)
 	if (node->animation_lerp_value >= 1) node->can_be_pressed = 1;
 }
 
-void click_node(struct game_image_node* node)
+int click_node(struct game_image_node* node)
 {
-	if (!node->can_be_pressed) return;
-	if (node->level >= game_smaller_images_level - 1) return;
+	if (!node->can_be_pressed) return 0;
+	if (node->level >= game_smaller_images_level - 1) return 0;
 
 	int new_level = node->level + 1;
 	int new_level_color_matrix_width = (1 << new_level);
@@ -104,7 +119,7 @@ void click_node(struct game_image_node* node)
 	struct game_image_node* n1 = malloc(sizeof(struct game_image_node));
 	struct game_image_node* n2 = malloc(sizeof(struct game_image_node));
 	struct game_image_node* n3 = malloc(sizeof(struct game_image_node));
-	//if (!n1 || !n2 || !n3) return -1;
+	if (!n1 || !n2 || !n3) return -1;
 
 	Vector2 pos_start = node->position;
 	Vector2 pos0 = (Vector2){ node->position.x + new_radius, node->position.y + new_radius };
@@ -153,6 +168,11 @@ void click_node(struct game_image_node* node)
 	node->next = n1;
 	n1->next = n2;
 	n2->next = n3;
+
+	++clicked_nodes;
+	//printf("%d/%d\n", clicked_nodes, total_nodes_to_click);
+
+	return 0;
 }
 
 void set_node_values(struct game_image_node* node, Color color_start, Color color_end, Vector2 position_start, Vector2 position_end, int level, float radius_start, float radius_end)
@@ -172,61 +192,7 @@ void set_node_values(struct game_image_node* node, Color color_start, Color colo
 	node->animation_end_color = color_end;
 }
 
-/*
-void update_game()
-{
-	if (!game_smaller_images_matrix) return;
-
-	int screen_width = GetScreenWidth();
-	int screen_height = GetScreenHeight();
-
-	if (IsKeyPressed(KEY_P)) game_current_level = (game_current_level + 1) % game_smaller_images_level;
-
-	int image_width = game_smaller_images_matrix[game_current_level].width;
-	int image_height = game_smaller_images_matrix[game_current_level].height;
-
-	BeginDrawing();
-	ClearBackground(RAYWHITE);
-
-	float image_total_radius = min(screen_width / 3, screen_height / 3);
-	float individual_pixel_radius = image_total_radius / image_height;
-
-	Vector2 center_position;
-	center_position.x = screen_width / 2;
-	center_position.y = screen_height / 2;
-
-	Vector2 min_position;
-	min_position.x = center_position.x - image_total_radius;
-	min_position.y = center_position.y - image_total_radius;
-
-	float position_pixel_increment = individual_pixel_radius * 2;
-
-	Color color;
-	color.a = 255;
-
-	for (int i = 0; i < image_height; ++i)
-	{
-		for (int j = 0; j < image_width; ++j)
-		{
-			color.r = game_smaller_images_matrix[game_current_level].pixel_rgb_matrix[i * image_width + j].r;
-			color.g = game_smaller_images_matrix[game_current_level].pixel_rgb_matrix[i * image_width + j].g;
-			color.b = game_smaller_images_matrix[game_current_level].pixel_rgb_matrix[i * image_width + j].b;
-
-			Vector2 position = min_position;
-			position.x += position_pixel_increment * j + individual_pixel_radius;
-			position.y += position_pixel_increment * i + individual_pixel_radius;
-
-			DrawCircleV(position, individual_pixel_radius, color);
-		}
-	}
-
-	//DrawRectangleLines(min_position.x, min_position.y, image_total_radius * 2, image_total_radius * 2, RED);
-
-	EndDrawing();
-}
-*/
-
-void load_image_matrix(struct image_data* img_mtrx, int level)
+int game_load_image_matrix(struct image_data* img_mtrx, int level)
 {
 	game_smaller_images_matrix = img_mtrx;
 	game_smaller_images_level = level;
@@ -234,7 +200,7 @@ void load_image_matrix(struct image_data* img_mtrx, int level)
 	game_current_level = 0;
 
 	nodes_list_first = malloc(sizeof(struct game_image_node));
-	//if (!nodes_list_first) { perror("malloc"); exit(1); }
+	if (!nodes_list_first) return -1;
 
 	nodes_list_first->level = 0;
 	nodes_list_first->radius = 128;
@@ -250,4 +216,10 @@ void load_image_matrix(struct image_data* img_mtrx, int level)
 	nodes_list_first->animation_end_radius = 128;
 	nodes_list_first->animation_end_position = (Vector2){ 128, 128 };
 	nodes_list_first->animation_end_color = (Color){ img_mtrx[0].pixel_rgb_matrix[0].r, img_mtrx[0].pixel_rgb_matrix[0].g, img_mtrx[0].pixel_rgb_matrix[0].b, 255 };
+
+	clicked_nodes = 0;
+	total_nodes_to_click = 0;
+	total_nodes_to_click = (pow(4, level - 1) - 1) / 3;
+
+	return 0;
 }
