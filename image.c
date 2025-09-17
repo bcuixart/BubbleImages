@@ -1,7 +1,9 @@
 #include "image.h"
 
-int read_image(char* filename, struct image_data* result)
+int read_image(char* filename, struct image_data** result)
 {
+	*result = malloc(sizeof(struct image_data));
+
 	FILE* file = fopen(filename, "r");
 	if (file == NULL) return -1;
 
@@ -10,11 +12,11 @@ int read_image(char* filename, struct image_data* result)
 	if (image_type == UNKNOWN) printf("Could not identify file type. You idiot.\nCurrently only PPM is supported.\n");
 	else if (image_type == PNG) {
 		printf("Type: PNG\n");
-		if (parse_png(file, result) == -1) return -1;
+		if (parse_png(file, *result) == -1) return -1;
 	}
 	else {
 		printf("Type: P%d\n", (image_type == PPM_P3) ? 3 : 6);
-		if (parse_ppm(file, result, (image_type == PPM_P3) ? 3 : 6) == -1) return -1;
+		if (parse_ppm(file, *result, (image_type == PPM_P3) ? 3 : 6) == -1) return -1;
 	}
 
 	if (fclose(file) == -1) return -1;

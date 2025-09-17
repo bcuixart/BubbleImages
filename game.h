@@ -11,6 +11,7 @@
 #include <raymath.h>
 
 #include "image.h"
+#include "lib/nfd/nfd.h"
 
 #define WINDOW_WIDTH 500
 #define WINDOW_HEIGHT 500
@@ -56,6 +57,7 @@ void animate_node(struct game_image_node* node, float delta_time);
 int click_node(struct game_image_node* node);
 void set_node_values(struct game_image_node* node, Color color_start, Color color_end, Vector2 position_start, Vector2 position_end, int level, float radius_start, float radius_end);
 
+int game_load_image(char* filename);
 int game_load_image_matrix(struct image_data* img_mtrx, int level);
 
 #endif

@@ -1,10 +1,13 @@
-# Variables
-CXX = gcc
-CXXFLAGS = -Wall
+# Compilador i flags
+CC = gcc
+CFLAGS = -Wall
 LDFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -lz
 
-SRC = main.c image.c png_parser.c ppm_parser.c game.c
-HDR = image.h png_parser.h ppm_parser.h game.h
+# Fitxers font i headers
+SRC = main.c image.c png_parser.c ppm_parser.c game.c \
+      lib/nfd/nfd_common.c lib/nfd/nfd_zenity.c
+HDR = image.h png_parser.h ppm_parser.h game.h \
+      lib/nfd/nfd.h lib/nfd/common.h lib/nfd/nfd_common.h lib/nfd/simple_exec.h
 OBJ = $(SRC:.c=.o)
 
 TARGET = main
@@ -12,14 +15,14 @@ TARGET = main
 # Regla principal
 all: $(TARGET)
 
-# Linkar
+# Enllaçar
 $(TARGET): $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Compilar cada .cc a .o, depenent també dels .hh
-%.o: %.cc $(HDR)
-	$(CXX) $(CXXFLAGS) -c $<
+# Compilar .c a .o
+%.o: %.c $(HDR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Netejar
+# Neteja
 clean:
 	rm -f $(OBJ) $(TARGET)

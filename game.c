@@ -30,6 +30,16 @@ void init_game_window()
 
 void close_game_window()
 {
+	if (game_smaller_images_matrix) 
+	{
+		for (int i = 0; i < game_smaller_images_level; i++) 
+		{
+			if (game_smaller_images_matrix[i].pixel_rgb_matrix) free(game_smaller_images_matrix[i].pixel_rgb_matrix);
+		}
+		free(game_smaller_images_matrix);
+		game_smaller_images_matrix = NULL;
+	}
+
 	CloseWindow();
 }
 
@@ -83,7 +93,12 @@ int update_game_no_image(int screen_width, int screen_height, float delta_time)
 		if (mouse_world.x >= load_button_position.x && mouse_world.x <= load_button_position.x + load_button_size.x &&
 			mouse_world.y >= load_button_position.y && mouse_world.y <= load_button_position.y + load_button_size.y)
 		{
-
+			char* file_path = NULL;
+			if (NFD_OpenDialog("png,ppm", NULL, &file_path) == NFD_OKAY)
+			{
+				if (game_load_image(file_path) == -1) return -1;
+				free(file_path);
+			}
 		}
 	}
 
@@ -232,6 +247,32 @@ void set_node_values(struct game_image_node* node, Color color_start, Color colo
 	node->animation_end_color = color_end;
 }
 
+int game_load_image(char* filename)
+{
+	struct image_data* read_image_data = NULL;
+	if (read_image(filename, &read_image_data) == -1) return -1;
+
+	printf("Read!\n");
+
+	struct image_data* smaller_images_matrix = malloc(sizeof(struct image_data) * GAME_LEVELS);
+	if (!smaller_images_matrix) return -1;
+
+	for (int i = 0; i < GAME_LEVELS; ++i)
+	{
+		int power_of_two = (1 << i);
+
+		if (get_smaller_image_data(read_image_data, &smaller_images_matrix[i], power_of_two, power_of_two) == -1) {
+			free(smaller_images_matrix);
+			return -1;
+		}
+	}
+
+	if (read_image_data->pixel_rgb_matrix) free(read_image_data->pixel_rgb_matrix);
+	if (read_image_data) free(read_image_data);
+
+	return game_load_image_matrix(smaller_images_matrix, GAME_LEVELS);
+}
+
 int game_load_image_matrix(struct image_data* img_mtrx, int level)
 {
 	game_smaller_images_matrix = img_mtrx;
@@ -261,5 +302,8 @@ int game_load_image_matrix(struct image_data* img_mtrx, int level)
 	total_nodes_to_click = 0;
 	total_nodes_to_click = (pow(4, level - 1) - 1) / 3;
 
+	state = Loaded_Image;
+
+	printf("Success!\n");
 	return 0;
 }
