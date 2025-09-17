@@ -11,7 +11,6 @@
 #include <raymath.h>
 
 #include "image.h"
-#include "tinyfiledialogs.h"
 
 #define WINDOW_WIDTH 500
 #define WINDOW_HEIGHT 500
@@ -39,11 +38,18 @@ struct game_image_node
 	unsigned char can_be_pressed;
 };
 
+enum game_state {
+	No_Image,
+	Loaded_Image
+};
+
 void init_game_window();
 void close_game_window();
 int should_close_game_window();
 
 int update_game();
+int update_game_no_image(int screen_width, int screen_height, float delta_time);
+int update_game_loaded_image(int screen_width, int screen_height, float delta_time);
 
 void animate_node(struct game_image_node* node, float delta_time);
 

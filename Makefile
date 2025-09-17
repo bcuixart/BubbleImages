@@ -3,8 +3,8 @@ CXX = gcc
 CXXFLAGS = -Wall
 LDFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -lz
 
-SRC = main.c image.c png_parser.c ppm_parser.c game.c tinyfiledialogs.c
-HDR = image.h png_parser.h ppm_parser.h game.h tinyfiledialogs.h
+SRC = main.c image.c png_parser.c ppm_parser.c game.c
+HDR = image.h png_parser.h ppm_parser.h game.h
 OBJ = $(SRC:.c=.o)
 
 TARGET = main

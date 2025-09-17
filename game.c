@@ -1,6 +1,8 @@
 #include "game.h"
 
 // Private variables
+enum game_state state;
+
 struct image_data* game_smaller_images_matrix;
 struct game_image_node* nodes_list_first;
 
@@ -17,6 +19,8 @@ void init_game_window()
 	InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Dorga");
 
 	SetTargetFPS(60);
+
+	state = No_Image;
 
 	game_smaller_images_matrix = NULL;
 	game_smaller_images_level = 0;
@@ -51,6 +55,45 @@ int update_game()
 	camera.rotation = 0.0f;
 	camera.zoom = 0.6666f * min(screen_width, screen_height) / 256.f;
 
+	switch (state) {
+	case No_Image:
+		if (update_game_no_image(screen_width, screen_height, delta_time) == -1) return -1;
+		break;
+	case Loaded_Image:
+		if (update_game_loaded_image(screen_width, screen_height, delta_time) == -1) return -1;
+		break;
+	}
+
+	EndMode2D();
+	EndDrawing();
+
+	return 0;
+}
+
+int update_game_no_image(int screen_width, int screen_height, float delta_time)
+{
+	Vector2 load_button_position = (Vector2){ 0, 128 };
+	Vector2 load_button_size = (Vector2){ 256, 64 };
+
+	if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+	{
+		Vector2 mouse_pos = GetMousePosition();
+		Vector2 mouse_world = GetScreenToWorld2D(mouse_pos, camera);
+
+		if (mouse_world.x >= load_button_position.x && mouse_world.x <= load_button_position.x + load_button_size.x &&
+			mouse_world.y >= load_button_position.y && mouse_world.y <= load_button_position.y + load_button_size.y)
+		{
+
+		}
+	}
+
+	DrawRectangleV(load_button_position, load_button_size, RED);
+
+	return 0;
+}
+
+int update_game_loaded_image(int screen_width, int screen_height, float delta_time)
+{
 	if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
 	{
 		Vector2 mouse_pos = GetMousePosition();
@@ -84,9 +127,6 @@ int update_game()
 	DrawRectangle(0, bar_position.y, 256, 10, RED);
 	int bar_length = (int)(((float)clicked_nodes / (float)total_nodes_to_click) * 256.f);
 	DrawRectangle(0, bar_position.y, bar_length, 10, GREEN);
-
-	EndMode2D();
-	EndDrawing();
 
 	return 0;
 }
