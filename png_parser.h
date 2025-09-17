@@ -65,23 +65,23 @@ int read_plte_chunk(FILE* file, struct png_info* image_info, int chunk_length);
 int read_idat_chunk(FILE* file, struct png_info* image_info, unsigned int chunk_length);
 int read_and_ignore_data(FILE* file, unsigned int bytes);
 
-int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, char** decompressed_data, uLongf* dest_len);
-int unfilter_data_stream(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, unsigned char** decompressed_data, uLongf* dest_len);
+int unfilter_data_stream(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
 
-int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
-int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int line_index);
-int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
-int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
+int unfilter_type_sub(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
+int unfilter_type_up(unsigned char* decompressed_data, int bytes_per_scanline, int line_index);
+int unfilter_type_average(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
+int unfilter_type_paeth(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index);
 
-int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
 
-int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
-int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
+int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length);
 
 int write_png_ihdr_chunk(struct image_data* image, int fd);
 int write_png_iend_chunk(struct image_data* image, int fd);

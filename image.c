@@ -20,6 +20,8 @@ int read_image(char* filename, struct image_data** result)
 	}
 
 	if (fclose(file) == -1) return -1;
+
+	return 0;
 }
 
 int save_image_as_png(struct image_data* data, char* filename)
@@ -44,10 +46,10 @@ enum ImageType get_image_type_from_file(FILE* file)
 	}
 	else if (c == 137)
 	{
-		unsigned char buff[8];
+		char buff[8];
 		fread(buff, 1, 7, file);
 
-		unsigned char expected_png_header[8] = { 80, 78, 71, 13, 10, 26, 10, '\0' };
+		char expected_png_header[8] = { 80, 78, 71, 13, 10, 26, 10, '\0' };
 		if (strcmp(buff, expected_png_header) == 0) return PNG;
 	}
 

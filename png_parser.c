@@ -21,7 +21,7 @@ int parse_png(FILE* file, struct image_data* image)
 
     printf("Read PNG. Decompressing...\n");
 
-    char* decompressed_data = NULL;
+    unsigned char* decompressed_data = NULL;
     uLongf dest_len = 0;
     if (uncompress_zlib_data_stream(&image_info, image, &decompressed_data, &dest_len) == -1) return -1;
 
@@ -106,7 +106,7 @@ enum png_chunk_type read_png_chunk(FILE* file, struct image_data* image, struct 
             break;
     }
         
-    unsigned int chunk_crc = read_four_byte_integer(file);
+    read_four_byte_integer(file); // CRC, but nobody cares
     //printf("Chunk crc: %d\n\n", chunk_crc);
 
     return chunk_type;
@@ -256,7 +256,7 @@ int read_and_ignore_data(FILE* file, unsigned int bytes)
 }
 
 // TO DO: Make own uncompressor
-int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, char** decompressed_data, uLongf* dest_len)
+int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* image, unsigned char** decompressed_data, uLongf* dest_len)
 {
     int bytes_per_scanline = image->width * image_info->bytes_per_pixel + 1;
     unsigned int expected_size = image->height * bytes_per_scanline;
@@ -275,7 +275,7 @@ int uncompress_zlib_data_stream(struct png_info* image_info, struct image_data* 
     return 0;
 }
 
-int unfilter_data_stream(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int unfilter_data_stream(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int bytes_per_scanline = image->width * image_info->bytes_per_pixel + 1;
 
@@ -304,7 +304,7 @@ int unfilter_data_stream(struct png_info* image_info, struct image_data* image, 
     return 0;
 }
 
-int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
+int unfilter_type_sub(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
     int offset = line_index * bytes_per_scanline;
 
@@ -316,7 +316,7 @@ int unfilter_type_sub(char* decompressed_data, int bytes_per_scanline, int bytes
     return 0;
 }
 
-int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int line_index)
+int unfilter_type_up(unsigned char* decompressed_data, int bytes_per_scanline, int line_index)
 {
     if (line_index <= 0) return 0; // Does not apply to first line
 
@@ -331,7 +331,7 @@ int unfilter_type_up(char* decompressed_data, int bytes_per_scanline, int line_i
     return 0;
 }
 
-int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
+int unfilter_type_average(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
     int offset = line_index * bytes_per_scanline;
     int offset_prev_line = (line_index - 1) * bytes_per_scanline;
@@ -347,7 +347,7 @@ int unfilter_type_average(char* decompressed_data, int bytes_per_scanline, int b
     return 0;
 }
 
-int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
+int unfilter_type_paeth(unsigned char* decompressed_data, int bytes_per_scanline, int bytes_per_pixel, int line_index)
 {
     int offset = line_index * bytes_per_scanline;
     int offset_prev_line = (line_index - 1) * bytes_per_scanline;
@@ -373,7 +373,7 @@ int unfilter_type_paeth(char* decompressed_data, int bytes_per_scanline, int byt
     return 0;
 }
 
-int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     switch (image_info->color_type)
     {
@@ -395,9 +395,11 @@ int fill_rgb_matrix(struct png_info* image_info, struct image_data* image, char*
         return fill_rgb_matrix_rgb_alpha(image_info, image, decompressed_data, decompressed_data_length);
         break;
     }
+
+    return -1;
 }
 
-int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -446,7 +448,7 @@ int fill_rgb_matrix_rgb(struct png_info* image_info, struct image_data* image, c
     return 0;
 }
 
-int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -459,21 +461,19 @@ int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* im
             unsigned int r;
             unsigned int g;
             unsigned int b;
-            unsigned int a;
 
             if (image_info->bit_depth == 8)
             {
                 r = decompressed_data[decompressed_data_byte_index++];
                 g = decompressed_data[decompressed_data_byte_index++];
                 b = decompressed_data[decompressed_data_byte_index++];
-                a = decompressed_data[decompressed_data_byte_index++];
+                decompressed_data_byte_index++; // Alpha
             }
             else if (image_info->bit_depth == 16)
             {
                 unsigned char r2;
                 unsigned char g2;
                 unsigned char b2;
-                unsigned char a2;
 
                 r = decompressed_data[decompressed_data_byte_index++];
                 r2 = decompressed_data[decompressed_data_byte_index++];
@@ -481,8 +481,8 @@ int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* im
                 g2 = decompressed_data[decompressed_data_byte_index++];
                 b = decompressed_data[decompressed_data_byte_index++];
                 b2 = decompressed_data[decompressed_data_byte_index++];                
-                a = decompressed_data[decompressed_data_byte_index++];
-                a2 = decompressed_data[decompressed_data_byte_index++];
+                decompressed_data_byte_index++; // Alpha
+                decompressed_data_byte_index++;
 
                 r = (r2 * 256 + r) / 255;
                 g = (g2 * 256 + g) / 255;
@@ -500,7 +500,7 @@ int fill_rgb_matrix_rgb_alpha(struct png_info* image_info, struct image_data* im
     return 0;
 }
 
-int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -537,7 +537,7 @@ int fill_rgb_matrix_grayscale_8_16(struct png_info* image_info, struct image_dat
     return 0;
 }
 
-int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -584,7 +584,7 @@ int fill_rgb_matrix_grayscale_1_2_4(struct png_info* image_info, struct image_da
     return 0;
 }
 
-int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -595,22 +595,20 @@ int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_da
         for (int j = 0; j < image->width; ++j)
         {
             unsigned int gs;
-            unsigned int a;
 
             if (image_info->bit_depth == 8)
             {
                 gs = decompressed_data[decompressed_data_byte_index++];
-                a = decompressed_data[decompressed_data_byte_index++];
+                decompressed_data_byte_index++; // Alpha
             }
             else if (image_info->bit_depth == 16)
             {
                 unsigned char gs2;
-                unsigned char a2;
 
                 gs = decompressed_data[decompressed_data_byte_index++];
                 gs2 = decompressed_data[decompressed_data_byte_index++];
-                a = decompressed_data[decompressed_data_byte_index++];
-                a2 = decompressed_data[decompressed_data_byte_index++];
+                decompressed_data_byte_index++;
+                decompressed_data_byte_index++;
 
                 gs = (gs2 * 256 + gs) / 255;
             }
@@ -626,7 +624,7 @@ int fill_rgb_matrix_grayscale_alpha(struct png_info* image_info, struct image_da
     return 0;
 }
 
-int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
@@ -649,7 +647,7 @@ int fill_rgb_matrix_palette_8(struct png_info* image_info, struct image_data* im
     return 0;
 }
 
-int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, char* decompressed_data, uLongf decompressed_data_length)
+int fill_rgb_matrix_palette_1_2_4(struct png_info* image_info, struct image_data* image, unsigned char* decompressed_data, uLongf decompressed_data_length)
 {
     int decompressed_data_byte_index = 0;
     for (int i = 0; i < image->height; ++i)
